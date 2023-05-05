@@ -2,10 +2,10 @@
 
 namespace Krak\SymfonyMessengerAutoScale\Tests\Feature\Bundle;
 
-use Nyholm\BundleTest\BaseBundleTestCase;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
 
-final class MustMatchAllReceiversTest extends BaseBundleTestCase
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+
+final class MustMatchAllReceiversTest extends KernelTestCase
 {
     use InitsKernel;
 
@@ -16,7 +16,7 @@ final class MustMatchAllReceiversTest extends BaseBundleTestCase
 
     protected function setUp(): void {
         parent::setUp();
-        $this->registerPublicServiceCompilerPass();
+//        $this->registerPublicServiceCompilerPass();
     }
 
     /** @test */

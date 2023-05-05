@@ -11,10 +11,12 @@ use Krak\SymfonyMessengerAutoScale\Tests\Feature\Fixtures\RequiresSupervisorPool
 use Krak\SymfonyMessengerRedis\MessengerRedisBundle;
 use Nyholm\BundleTest\BaseBundleTestCase;
 use Nyholm\BundleTest\CompilerPass\PublicServicePass;
+use Nyholm\BundleTest\TestKernel;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Process\Process;
 
-final class BundleTest extends BaseBundleTestCase
+final class BundleTest extends KernelTestCase
 {
     /** @var RequiresSupervisorPoolConfigs */
     private $requiresPoolConfigs;
@@ -22,7 +24,7 @@ final class BundleTest extends BaseBundleTestCase
 
     protected function setUp(): void {
         parent::setUp();
-        $this->addCompilerPass(new PublicServicePass('/(Krak.*|krak\..*|messenger.default_serializer|messenger.receiver_locator|.*MessageBus.*)/'));
+//        $this->addCompilerPass(new PublicServicePass('/(Krak.*|krak\..*|messenger.default_serializer|messenger.receiver_locator|.*MessageBus.*)/'));
     }
 
     protected function tearDown(): void {
@@ -31,8 +33,9 @@ final class BundleTest extends BaseBundleTestCase
         }
     }
 
-    protected function getBundleClass() {
-        return MessengerAutoScaleBundle::class;
+    protected static function getKernelClass(): string
+    {
+        return TestKernel::class;
     }
 
     /** @test */
@@ -84,14 +87,18 @@ final class BundleTest extends BaseBundleTestCase
     }
 
     private function given_the_kernel_is_booted_with_config(array $configFiles) {
-        $kernel = $this->createKernel();
-        $kernel->addBundle(Fixtures\TestFixtureBundle::class);
-        $kernel->addBundle(MessengerRedisBundle::class);
-        $kernel->addConfigFile(__DIR__ . '/Fixtures/framework-config.yaml');
+        /** @var TestKernel $kernel */
+        $kernel = parent::createKernel();
+        $kernel->addTestBundle(MessengerAutoScaleBundle::class);
+        $kernel->addTestBundle(Fixtures\TestFixtureBundle::class);
+        $kernel->addTestBundle(MessengerRedisBundle::class);
+        $kernel->addTestConfig(__DIR__ . '/Fixtures/framework-config.yaml');
         foreach ($configFiles as $configFile) {
-            $kernel->addConfigFile($configFile);
+            $kernel->addTestConfig($configFile);
         }
-        $this->bootKernel();
+        $kernel->boot();
+        static::$kernel = $kernel;
+        static::$booted = true;
     }
 
     private function messengerAndAutoScaleConfig(): array {
@@ -109,7 +116,7 @@ final class BundleTest extends BaseBundleTestCase
     }
 
     private function given_the_supervisor_is_started() {
-        $this->proc = new Process([__DIR__ . '/Fixtures/console', 'krak:auto-scale:consume']);
+        $this->proc = new Process(['php', __DIR__ . '/Fixtures/console', 'krak:auto-scale:consume']);
         $this->proc
             ->setTimeout(null)
             ->disableOutput()

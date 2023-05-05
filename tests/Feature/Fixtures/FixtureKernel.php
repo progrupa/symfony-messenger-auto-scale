@@ -15,18 +15,14 @@ final class FixtureKernel extends \Symfony\Component\HttpKernel\Kernel
 {
     use MicroKernelTrait;
 
-    public function getProjectDir() {
+    public function getProjectDir(): string {
         return __DIR__ . '/../../..';
     }
 
-    public function registerBundles() {
+    public function registerBundles(): iterable {
         yield new FrameworkBundle();
         yield new MessengerRedisBundle();
         yield new MessengerAutoScaleBundle();
-    }
-
-    protected function configureRoutes(RouteCollectionBuilder $routes) {
-        // TODO: Implement configureRoutes() method.
     }
 
     protected function configureContainer(ContainerBuilder $c, LoaderInterface $loader) {

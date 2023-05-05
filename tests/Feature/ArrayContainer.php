@@ -18,7 +18,7 @@ final class ArrayContainer implements ContainerInterface
         return $this->services[$id];
     }
 
-    public function has($id) {
+    public function has(string $id): bool {
         return isset($this->services[$id]);
     }
 }

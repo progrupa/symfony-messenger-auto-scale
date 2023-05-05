@@ -22,6 +22,7 @@ final class ConsumeCommand extends Command
     }
 
     protected function execute(InputInterface $input, OutputInterface $output) {
+        echo "RUNNING!";
         $output->writeln('<info>Starting Supervisor.</info>');
         $this->supervisor->run();
         return 0;

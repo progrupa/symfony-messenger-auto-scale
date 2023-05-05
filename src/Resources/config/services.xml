@@ -46,6 +46,7 @@
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\PauseCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\RestartCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\ResumeCommand"/>
+        <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\ShutdownCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\StatusCommand"/>
     </services>
 </container>

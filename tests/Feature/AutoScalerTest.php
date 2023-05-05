@@ -3,21 +3,17 @@
 namespace Krak\SymfonyMessengerAutoScale\Tests\Feature;
 
 use Krak\SymfonyMessengerAutoScale\AutoScale;
+use Krak\SymfonyMessengerAutoScale\AutoScaler;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use PHPUnit\Framework\TestCase;
 
 final class AutoScaleTest extends TestCase
 {
-    private $autoScale;
-    private $poolConfig;
+    private AutoScaler $autoScale;
     /** @var AutoScale\AutoScaleResponse|null */
     private $autoScaleResp;
     private $autoScaleState;
     private $timeSinceLastCall;
-
-    protected function setUp(): void {
-        $this->poolConfig = new PoolConfig();
-    }
 
     /**
      * @test
@@ -25,8 +21,7 @@ final class AutoScaleTest extends TestCase
      */
     public function can_clip_to_min_max_boundaries(int $numProcs, int $expectedNumProcs) {
         $this->given_there_is_a_static_auto_scale_at($numProcs);
-        $this->given_there_is_a_wrapping_min_max_auto_scale();
-        $this->given_the_pool_config_has_min_max(1, 5);
+        $this->given_there_is_a_wrapping_min_max_auto_scale(1, 5);
         $this->when_auto_scale_occurs();
         $this->then_expected_num_procs_is($expectedNumProcs);
     }
@@ -42,8 +37,7 @@ final class AutoScaleTest extends TestCase
      * @dataProvider provide_for_queue_size_and_message_rate
      */
     public function can_determine_num_procs_on_queue_size_and_message_rate(int $queueSize, int $messageRate, int $expectedNumProcs) {
-        $this->given_there_is_a_queue_size_threshold_auto_scale();
-        $this->given_the_pool_config_has_message_rate($messageRate);
+        $this->given_there_is_a_queue_size_threshold_auto_scale($messageRate);
         $this->when_auto_scale_occurs($queueSize);
         $this->then_expected_num_procs_is($expectedNumProcs);
     }
@@ -66,12 +60,9 @@ final class AutoScaleTest extends TestCase
      * @param array<array{int, int}>> $runs array of tuples where first element is queueSize and next element is current num procs
      */
     public function debounces_auto_scaling(array $runs, int $expectedProcs) {
-        $this->given_there_is_a_queue_size_threshold_auto_scale();
-        $this->given_there_is_a_wrapping_debouncing_auto_scale();
-        $this->given_the_pool_config_has_message_rate(1);
+        $this->given_there_is_a_queue_size_threshold_auto_scale(1);
+        $this->given_there_is_a_wrapping_debouncing_auto_scale(2, 4);
         $this->given_the_time_since_last_call_is(1);
-        $this->given_the_pool_config_has_scale_up_threshold_of(2);
-        $this->given_the_pool_config_has_scale_down_threshold_of(4);
         $this->when_auto_scale_occurs_n_times($runs);
         $this->then_expected_num_procs_is($expectedProcs);
     }
@@ -146,45 +137,29 @@ final class AutoScaleTest extends TestCase
     }
 
     private function given_there_is_a_static_auto_scale_at(int $numProcs): void {
-        $this->autoScale = new class($numProcs) implements AutoScale {
+        $this->autoScale = new class($numProcs) implements AutoScaler {
             private $expectedNumProcs;
 
             public function __construct(int $expectedNumProcs) {
                 $this->expectedNumProcs = $expectedNumProcs;
             }
 
-            public function __invoke(AutoScale\AutoScaleRequest $req): AutoScale\AutoScaleResponse {
-                return new AutoScale\AutoScaleResponse($req->state(), $this->expectedNumProcs);
+            public function scale(AutoScale\AutoScaleRequest $autoScaleRequest): AutoScale\AutoScaleResponse {
+                return new AutoScale\AutoScaleResponse($autoScaleRequest->state(), $this->expectedNumProcs);
             }
         };
     }
 
-    private function given_there_is_a_queue_size_threshold_auto_scale(): void {
-        $this->autoScale = new AutoScale\QueueSizeMessageRateAutoScale();
+    private function given_there_is_a_queue_size_threshold_auto_scale(int $messageRate): void {
+        $this->autoScale = new AutoScale\QueueSizeMessageRateAutoScaler($messageRate);
     }
 
-    private function given_there_is_a_wrapping_min_max_auto_scale(): void {
-        $this->autoScale = new AutoScale\MinMaxClipAutoScale($this->autoScale);
+    private function given_there_is_a_wrapping_min_max_auto_scale(int $min, int $max): void {
+        $this->autoScale = new AutoScale\MinMaxClipAutoScaler($this->autoScale, $min, $max);
     }
 
-    private function given_there_is_a_wrapping_debouncing_auto_scale(): void {
-        $this->autoScale = new AutoScale\DebouncingAutoScale($this->autoScale);
-    }
-
-    private function given_the_pool_config_has_min_max(?int $min, ?int $max): void {
-        $this->poolConfig = $this->poolConfig->withMinMax($min, $max);
-    }
-
-    private function given_the_pool_config_has_message_rate(int $messageRate): void {
-        $this->poolConfig = $this->poolConfig->withMessageRate($messageRate);
-    }
-
-    private function given_the_pool_config_has_scale_up_threshold_of(int $threshold) {
-        $this->poolConfig = $this->poolConfig->withScaleUpThresholdSeconds($threshold);
-    }
-
-    private function given_the_pool_config_has_scale_down_threshold_of(int $threshold) {
-        $this->poolConfig = $this->poolConfig->withScaleDownThresholdSeconds($threshold);
+    private function given_there_is_a_wrapping_debouncing_auto_scale(int $scaleUpThreshold = 0, int $scaleDownThreshold = 0): void {
+        $this->autoScale = new AutoScale\DebouncingAutoScaler($this->autoScale, $scaleUpThreshold, $scaleDownThreshold);
     }
 
     private function given_the_time_since_last_call_is(?int $timeSinceLastCall) {
@@ -192,7 +167,7 @@ final class AutoScaleTest extends TestCase
     }
 
     private function when_auto_scale_occurs(int $queueSize = 1, int $numProcs = 1) {
-        $this->autoScaleResp = ($this->autoScale)(new AutoScale\AutoScaleRequest($this->autoScaleState, $this->timeSinceLastCall, $numProcs, $queueSize, $this->poolConfig));
+        $this->autoScaleResp = $this->autoScale->scale(new AutoScale\AutoScaleRequest($this->autoScaleState, $this->timeSinceLastCall, $numProcs, $queueSize));
         $this->autoScaleState = $this->autoScaleResp->state();
     }
 

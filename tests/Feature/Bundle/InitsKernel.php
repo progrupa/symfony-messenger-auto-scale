@@ -5,27 +5,25 @@ namespace Krak\SymfonyMessengerAutoScale\Tests\Feature\Bundle;
 use Krak\SymfonyMessengerAutoScale\MessengerAutoScaleBundle;
 use Krak\SymfonyMessengerAutoScale\Tests\Feature\Fixtures\TestFixtureBundle;
 use Krak\SymfonyMessengerRedis\MessengerRedisBundle;
-use Nyholm\BundleTest\CompilerPass\PublicServicePass;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Nyholm\BundleTest\TestKernel;
 
 trait InitsKernel
 {
-    protected function getBundleClass() {
-        return MessengerAutoScaleBundle::class;
-    }
-
-    private function registerPublicServiceCompilerPass() {
-        $this->addCompilerPass(new PublicServicePass('/(Krak.*|krak\..*|messenger.default_serializer|.*MessageBus.*)/'));
+    protected static function getKernelClass(): string
+    {
+        return TestKernel::class;
     }
 
     private function given_the_kernel_is_booted_with_config_resources(array $configResources) {
-        $kernel = $this->createKernel();
-        $kernel->addBundle(TestFixtureBundle::class);
-        $kernel->addBundle(MessengerRedisBundle::class);
+        /** @var TestKernel $kernel */
+        $kernel = parent::createKernel();
+        $kernel->addTestBundle(MessengerAutoScaleBundle::class);
+        $kernel->addTestBundle(TestFixtureBundle::class);
+        $kernel->addTestBundle(MessengerRedisBundle::class);
         foreach ($configResources as $config) {
-            $kernel->addConfigFile($config);
+            $kernel->addTestConfig($config);
         }
-        $this->bootKernel();
+        $kernel->boot();
     }
 
     private function given_the_kernel_is_booted_with_messenger_and_auto_scale_config() {

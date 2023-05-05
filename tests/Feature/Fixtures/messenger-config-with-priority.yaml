@@ -2,14 +2,14 @@ framework:
   messenger:
     transports:
       catalog_low:
-        dsn: 'redis://redis:6379?queue=catalog'
+        dsn: 'redis://127.0.0.1:6379?queue=catalog'
         options: { priority: -1 }
-      catalog: 'redis://redis:6379?queue=catalog'
+      catalog: 'redis://127.0.0.1:6379?queue=catalog'
       catalog_highest:
-        dsn: 'redis://redis:6379?queue=catalog'
+        dsn: 'redis://127.0.0.1:6379?queue=catalog'
         options: { priority: 2 }
       catalog_high:
-        dsn: 'redis://redis:6379?queue=catalog'
+        dsn: 'redis://127.0.0.1:6379?queue=catalog'
         options: { priority: 1 }
     routing:
       'Krak\SymfonyMessengerAutoScale\Tests\Feature\Fixtures\Message\CatalogMessage': [catalog_low, catalog, catalog_high, catalog_highest]

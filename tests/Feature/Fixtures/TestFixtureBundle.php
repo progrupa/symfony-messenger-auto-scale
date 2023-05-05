@@ -5,14 +5,15 @@ namespace Krak\SymfonyMessengerAutoScale\Tests\Feature\Fixtures;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
+use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 final class TestFixtureBundle extends Bundle
 {
-    public function getContainerExtension() {
+    public function getContainerExtension(): ?ExtensionInterface {
         return new class() extends Extension {
-            public function getAlias() {
+            public function getAlias(): string {
                 return 'messenger_auto_scale_test';
             }
 

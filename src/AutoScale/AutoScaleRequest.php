@@ -10,14 +10,12 @@ final class AutoScaleRequest
     private $timeSinceLastCall;
     private $numProcs;
     private $sizeOfQueue;
-    private $poolConfig;
 
-    public function __construct(?array $state, ?int $timeSinceLastCall, int $numProcs, int $sizeOfQueue, PoolConfig $poolConfig) {
+    public function __construct(?array $state, ?int $timeSinceLastCall, int $numProcs, int $sizeOfQueue) {
         $this->state = $state;
         $this->timeSinceLastCall = $timeSinceLastCall;
         $this->numProcs = $numProcs;
         $this->sizeOfQueue = $sizeOfQueue;
-        $this->poolConfig = $poolConfig;
     }
 
     public function state(): ?array {
@@ -34,9 +32,5 @@ final class AutoScaleRequest
 
     public function sizeOfQueue(): int {
         return $this->sizeOfQueue;
-    }
-
-    public function poolConfig(): PoolConfig {
-        return $this->poolConfig;
     }
 }

@@ -12,8 +12,8 @@ return static function(ContainerConfigurator $configurator) {
             ->public()
         ->set(RequiresSupervisorPoolConfigs::class)
             ->args([
-                ref('krak.messenger_auto_scale.supervisor_pool_configs'),
-                ref('krak.messenger_auto_scale.receiver_to_pool_mapping')
+                service('krak.messenger_auto_scale.supervisor_pool_configs'),
+                service('krak.messenger_auto_scale.receiver_to_pool_mapping')
             ])
         ->set(HandleCatalogMessage::class)
             ->tag('messenger.message_handler')

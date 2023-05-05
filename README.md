@@ -174,9 +174,9 @@ messenger_auto_scale:
 If you want to augment or perform your own auto-scaling algorithm, you can implement the AutoScale interface and then update the `Krak\SymfonyMessengerAutoScale\AutoScale` to point to your new auto scale service. The default service is defined like:
 
 ```php
-use Krak\SymfonyMessengerAutoScale\AutoScale;
+use Krak\SymfonyMessengerAutoScale\AutoScaler;
 
-$autoScale = new AutoScale\MinMaxClipAutoScale(new AutoScale\DebouncingAutoScale(new AutoScale\QueueSizeMessageRateAutoScale()));
+$autoScale = new AutoScale\MinMaxClipAutoScaler(new AutoScale\DebouncingAutoScaler(new AutoScale\QueueSizeMessageRateAutoScaler()));
 ```
 
 ## Alerts

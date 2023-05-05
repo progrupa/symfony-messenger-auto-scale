@@ -2,8 +2,13 @@
 
 namespace Krak\SymfonyMessengerAutoScale;
 
+use Krak\SymfonyMessengerAutoScale\AutoScale\DebouncingAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScale\MinMaxClipAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
 use Psr\Log\{LoggerInterface, NullLogger};
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Container\ContainerInterface;
+use Symfony\Component\Cache\CacheItem;
 
 /**
  * Entrypoint for managing worker pools.
@@ -11,27 +16,38 @@ use Psr\Container\ContainerInterface;
 final class Supervisor
 {
     const SLEEP_TIME = 1;
+    const SHUTDOWN_CACHE_KEY = 'krak.supervisor.shutdown_timestamp';
 
     private $processManagerFactory;
     private $poolControlFactory;
     private $receiversById;
+    private $appCache;
     private $supervisorPoolConfigs;
-    private $autoScale;
     private $logger;
     private $shouldShutdown = false;
+    private $supervisorStartedAt;
 
     /** @param SupervisorPoolConfig[] $supervisorPoolConfigs */
-    public function __construct(ProcessManagerFactory $processManagerFactory, PoolControlFactory $poolControlFactory, ContainerInterface $receiversById, array $supervisorPoolConfigs, ?AutoScale $autoScale = null, ?LoggerInterface $logger = null) {
+    public function __construct(
+        ProcessManagerFactory  $processManagerFactory,
+        PoolControlFactory     $poolControlFactory,
+        ContainerInterface     $receiversById,
+        CacheItemPoolInterface $appCache,
+        array                  $supervisorPoolConfigs,
+        ?LoggerInterface       $logger = null
+    ) {
         $this->processManagerFactory = $processManagerFactory;
         $this->poolControlFactory = $poolControlFactory;
         $this->receiversById = $receiversById;
+        $this->appCache = $appCache;
         $this->supervisorPoolConfigs = $this->assertUniquePoolNames($supervisorPoolConfigs);
-        $this->autoScale = $autoScale ?: self::defaultAutoScale();
         $this->logger = new EventLogger($logger ?: new NullLogger());
+
+        $this->supervisorStartedAt = microtime(true);
     }
 
-    public static function defaultAutoScale(): AutoScale {
-        return new AutoScale\MinMaxClipAutoScale(new AutoScale\DebouncingAutoScale(new AutoScale\QueueSizeMessageRateAutoScale()));
+    public static function defaultAutoScale(): AutoScaler {
+        return new AutoScale\MinMaxClipAutoScaler(new AutoScale\DebouncingAutoScaler(new AutoScale\QueueSizeMessageRateAutoScaler()));
     }
 
     public function run(): void {
@@ -45,10 +61,19 @@ final class Supervisor
             }
             sleep(self::SLEEP_TIME);
             $timeSinceLastCall = self::SLEEP_TIME;
+            $this->checkShutdown();
         }
 
         foreach ($workerPools as $pool) {
             $pool->stop();
+        }
+    }
+
+    private function checkShutdown(): void
+    {
+        $shutdownTime = $this->appCache->getItem(self::SHUTDOWN_CACHE_KEY);
+        if ($shutdownTime->isHit() && $shutdownTime->get() > $this->supervisorStartedAt) {
+            $this->shouldShutdown = true;
         }
     }
 
@@ -76,7 +101,7 @@ final class Supervisor
                 AggregatingReceiverMessageCount::createFromReceiverIds($config->receiverIds(), $this->receiversById),
                 $this->poolControlFactory->createForWorker($config->name()),
                 $this->processManagerFactory->createFromSupervisorPoolConfig($config),
-                $this->autoScale,
+                $this->buildAutoScale($config->poolConfig()),
                 $this->logger,
                 $config->poolConfig()
             );
@@ -90,5 +115,18 @@ final class Supervisor
                 $this->shouldShutdown = true;
             });
         }
+    }
+
+    private function buildAutoScale(PoolConfig $config)
+    {
+        foreach (array_reverse($config->getScalers()) as $scalerConfig) {
+            $scaler = match ($scalerConfig['type']) {
+                'queue-size' => new QueueSizeMessageRateAutoScaler($scalerConfig['message_rate']),
+                'min-max' => new MinMaxClipAutoScaler($scaler, $scalerConfig['min_procs'], $scalerConfig['max_procs']),
+                'debounce' => new DebouncingAutoScaler($scaler, $scalerConfig['scale_up_threshold_seconds'], $scalerConfig['scale_down_threshold_seconds']),
+            };
+        }
+
+        return $scaler;
     }
 }

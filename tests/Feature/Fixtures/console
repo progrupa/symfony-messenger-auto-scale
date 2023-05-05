@@ -31,3 +31,4 @@ if ($debug) {
 $kernel = new FixtureKernel($env, $debug);
 $application = new Application($kernel);
 $application->run($input);
+

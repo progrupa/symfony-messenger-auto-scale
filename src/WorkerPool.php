@@ -15,25 +15,25 @@ final class WorkerPool
 {
     const DEFAULT_HEARTBEAT_INTERVAL = 60;
 
-    private $name;
-    private $getMessageCount;
-    private $poolControl;
-    private $processManager;
-    private $autoScale;
-    private $logger;
-    private $poolConfig;
-    private $procs;
+    private string $name;
+    private MessageCountAwareInterface $getMessageCount;
+    private WorkerPoolControl $poolControl;
+    private ProcessManager $processManager;
+    private AutoScaler $autoScale;
+    private EventLogger $logger;
+    private PoolConfig $poolConfig;
+    private array $procs;
     private $autoScaleState;
     private $timeSinceLastHeartBeat = 0;
 
     public function __construct(
-        string $name,
+        string                     $name,
         MessageCountAwareInterface $getMessageCount,
-        WorkerPoolControl $poolControl,
-        ProcessManager $processManager,
-        AutoScale $autoScale,
-        EventLogger $logger,
-        PoolConfig $poolConfig
+        WorkerPoolControl          $poolControl,
+        ProcessManager             $processManager,
+        AutoScaler                 $autoScale,
+        EventLogger                $logger,
+        PoolConfig                 $poolConfig
     ) {
         $this->name = $name;
         $this->getMessageCount = $getMessageCount;
@@ -57,7 +57,7 @@ final class WorkerPool
         $this->beatHeart($poolConfig, $sizeOfQueues, $timeSinceLastCallInSeconds);
         $this->refreshDeadProcs();
 
-        $resp = ($this->autoScale)(new AutoScaleRequest($this->autoScaleState, $timeSinceLastCallInSeconds, $this->numProcs(), $sizeOfQueues, $poolConfig));
+        $resp = $this->autoScale->scale(new AutoScaleRequest($this->autoScaleState, $timeSinceLastCallInSeconds, $this->numProcs(), $sizeOfQueues, $poolConfig));
         $this->scaleTo($resp->expectedNumProcs());
         $this->autoScaleState = $resp->state();
     }

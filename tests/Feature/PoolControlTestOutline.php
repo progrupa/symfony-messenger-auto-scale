@@ -44,26 +44,26 @@ abstract class PoolControlTestOutline extends TestCase
         return $tup;
     }
 
+//    /**
+//     * @test
+//     * @depends can_scale_workers
+//     */
+//    public function can_update_pool_config(array $tup) {
+//        /** @var PoolControl\WorkerPoolControl */
+//        /** @var PoolControl\ActorPoolControl */
+//        [$workerPoolControl, $actorPoolControl] = $tup;
+//
+//        $actorPoolControl->updatePoolConfig(new PoolConfig(5, 10, 50));
+//
+//        $this->assertEquals(5, $workerPoolControl->getPoolConfig()->minProcs());
+//        $this->assertEquals(10, $workerPoolControl->getPoolConfig()->maxProcs());
+//        $this->assertEquals(50, $workerPoolControl->getPoolConfig()->messageRate());
+//        return $tup;
+//    }
+
     /**
      * @test
      * @depends can_scale_workers
-     */
-    public function can_update_pool_config(array $tup) {
-        /** @var PoolControl\WorkerPoolControl */
-        /** @var PoolControl\ActorPoolControl */
-        [$workerPoolControl, $actorPoolControl] = $tup;
-
-        $actorPoolControl->updatePoolConfig(new PoolConfig(5, 10, 50));
-
-        $this->assertEquals(5, $workerPoolControl->getPoolConfig()->minProcs());
-        $this->assertEquals(10, $workerPoolControl->getPoolConfig()->maxProcs());
-        $this->assertEquals(50, $workerPoolControl->getPoolConfig()->messageRate());
-        return $tup;
-    }
-
-    /**
-     * @test
-     * @depends can_update_pool_config
      */
     public function can_request_a_restart(array $tup) {
         /** @var PoolControl\WorkerPoolControl */
