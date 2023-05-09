@@ -116,7 +116,7 @@ final class BundleTest extends KernelTestCase
     }
 
     private function given_the_supervisor_is_started() {
-        $this->proc = new Process(['php', __DIR__ . '/Fixtures/console', 'krak:auto-scale:consume']);
+        $this->proc = new Process([__DIR__ . '/Fixtures/console', 'krak:auto-scale:consume']);
         $this->proc
             ->setTimeout(null)
             ->disableOutput()

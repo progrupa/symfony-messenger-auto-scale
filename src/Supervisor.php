@@ -8,7 +8,6 @@ use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
 use Psr\Log\{LoggerInterface, NullLogger};
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Container\ContainerInterface;
-use Symfony\Component\Cache\CacheItem;
 
 /**
  * Entrypoint for managing worker pools.
@@ -44,10 +43,6 @@ final class Supervisor
         $this->logger = new EventLogger($logger ?: new NullLogger());
 
         $this->supervisorStartedAt = microtime(true);
-    }
-
-    public static function defaultAutoScale(): AutoScaler {
-        return new AutoScale\MinMaxClipAutoScaler(new AutoScale\DebouncingAutoScaler(new AutoScale\QueueSizeMessageRateAutoScaler()));
     }
 
     public function run(): void {
@@ -101,7 +96,6 @@ final class Supervisor
                 AggregatingReceiverMessageCount::createFromReceiverIds($config->receiverIds(), $this->receiversById),
                 $this->poolControlFactory->createForWorker($config->name()),
                 $this->processManagerFactory->createFromSupervisorPoolConfig($config),
-                $this->buildAutoScale($config->poolConfig()),
                 $this->logger,
                 $config->poolConfig()
             );
@@ -117,16 +111,4 @@ final class Supervisor
         }
     }
 
-    private function buildAutoScale(PoolConfig $config)
-    {
-        foreach (array_reverse($config->getScalers()) as $scalerConfig) {
-            $scaler = match ($scalerConfig['type']) {
-                'queue-size' => new QueueSizeMessageRateAutoScaler($scalerConfig['message_rate']),
-                'min-max' => new MinMaxClipAutoScaler($scaler, $scalerConfig['min_procs'], $scalerConfig['max_procs']),
-                'debounce' => new DebouncingAutoScaler($scaler, $scalerConfig['scale_up_threshold_seconds'], $scalerConfig['scale_down_threshold_seconds']),
-            };
-        }
-
-        return $scaler;
-    }
 }

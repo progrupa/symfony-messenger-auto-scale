@@ -3,13 +3,16 @@
 namespace Krak\SymfonyMessengerAutoScale\AutoScale;
 
 use Krak\SymfonyMessengerAutoScale\AutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScalerConfig;
 
-abstract class IntermediateAutoScaler implements AutoScaler
+abstract class BaseAutoScaler implements AutoScaler
 {
-    protected AutoScaler $subordinate;
+    protected AutoScalerConfig $config;
+    protected ?AutoScaler $subordinate;
 
-    public function __construct(AutoScaler $subordinate)
+    public function __construct(AutoScalerConfig $config, ?AutoScaler $subordinate = null)
     {
+        $this->config = $config;
         $this->subordinate = $subordinate;
     }
 

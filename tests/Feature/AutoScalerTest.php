@@ -3,8 +3,9 @@
 namespace Krak\SymfonyMessengerAutoScale\Tests\Feature;
 
 use Krak\SymfonyMessengerAutoScale\AutoScale;
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerType;
 use Krak\SymfonyMessengerAutoScale\AutoScaler;
-use Krak\SymfonyMessengerAutoScale\PoolConfig;
+use Krak\SymfonyMessengerAutoScale\AutoScalerConfig;
 use PHPUnit\Framework\TestCase;
 
 final class AutoScaleTest extends TestCase
@@ -51,6 +52,42 @@ final class AutoScaleTest extends TestCase
         yield 'queue@201,100' => [201, 100, 3];
         yield 'queue@53,5' => [53, 5, 11];
         yield 'queue@57,5' => [57, 5, 12];
+    }
+
+    /**
+     * @test
+     * @dataProvider provide_for_queue_size_and_allowed_overflow
+     */
+    public function can_determine_num_procs_on_queue_size_and_allowed_overflow(int $queueSize, int $allowedOverflow, int $originalNumProcs, int $expectedNumProcs) {
+        $this->given_there_is_a_queue_not_empty_auto_scale($allowedOverflow);
+        $this->when_auto_scale_occurs($queueSize, $originalNumProcs);
+        $this->then_expected_num_procs_is($expectedNumProcs);
+    }
+
+    public function provide_for_queue_size_and_allowed_overflow() {
+        yield 'queue empty, zero processes, unchanged' => [0, 5, 0, 0];
+        yield 'queue empty, should reduce' => [0, 5, 1, 0];
+        yield 'queue overflowing, should increase' => [100, 5, 0, 1];
+        yield 'queue within limit, unchanged' => [5, 5, 99, 99];
+        yield 'queue on limit edge, unchanged' => [5, 5, 99, 99];
+    }
+
+    /**
+     * @test
+     * @dataProvider provide_for_queue_size_and_allowed_overflow_per_worker
+     */
+    public function can_determine_num_procs_on_queue_size_and_allowed_overflow_per_worker(int $queueSize, int $allowedPerProc, int $originalNumProcs, int $expectedNumProcs) {
+        $this->given_there_is_a_queue_not_empty_auto_scale(0, $allowedPerProc);
+        $this->when_auto_scale_occurs($queueSize, $originalNumProcs);
+        $this->then_expected_num_procs_is($expectedNumProcs);
+    }
+
+    public function provide_for_queue_size_and_allowed_overflow_per_worker() {
+        yield 'queue empty, zero processes, unchanged' => [0, 5, 0, 0];
+        yield 'queue empty, should reduce' => [0, 5, 2, 1];
+        yield 'queue overflowing, should increase' => [6, 5, 1, 2];
+        yield 'queue within limit, unchanged' => [5, 5, 10, 10];
+        yield 'queue on limit edge, unchanged' => [50, 5, 10, 10];
     }
 
     /**
@@ -151,15 +188,26 @@ final class AutoScaleTest extends TestCase
     }
 
     private function given_there_is_a_queue_size_threshold_auto_scale(int $messageRate): void {
-        $this->autoScale = new AutoScale\QueueSizeMessageRateAutoScaler($messageRate);
+        $this->autoScale = new AutoScale\QueueSizeMessageRateAutoScaler(new AutoScalerConfig(AutoScalerType::QUEUE_SIZE, [AutoScale\QueueSizeMessageRateAutoScaler::PARAM_MESSAGE_RATE => $messageRate]));
+    }
+
+    private function given_there_is_a_queue_not_empty_auto_scale(int $allowedOverflow, ?int $allowedPerProc = 0): void {
+        $this->autoScale = new AutoScale\QueueNotEmptyAutoScaler(
+            new AutoScalerConfig(AutoScalerType::QUEUE_NOT_EMPTY, [AutoScale\QueueNotEmptyAutoScaler::PARAM_ALLOWED_OVERFLOW => $allowedOverflow, AutoScale\QueueNotEmptyAutoScaler::PARAM_ALLOWED_OVERFLOW_PER_PROC => $allowedPerProc]));
     }
 
     private function given_there_is_a_wrapping_min_max_auto_scale(int $min, int $max): void {
-        $this->autoScale = new AutoScale\MinMaxClipAutoScaler($this->autoScale, $min, $max);
+        $this->autoScale = new AutoScale\MinMaxClipAutoScaler(
+            new AutoScalerConfig(AutoScalerType::MIN_MAX, [AutoScale\MinMaxClipAutoScaler::PARAM_MIN_PROCESS_COUNT => $min, AutoScale\MinMaxClipAutoScaler::PARAM_MAX_PROCESS_COUNT => $max]),
+            $this->autoScale
+        );
     }
 
     private function given_there_is_a_wrapping_debouncing_auto_scale(int $scaleUpThreshold = 0, int $scaleDownThreshold = 0): void {
-        $this->autoScale = new AutoScale\DebouncingAutoScaler($this->autoScale, $scaleUpThreshold, $scaleDownThreshold);
+        $this->autoScale = new AutoScale\DebouncingAutoScaler(
+            new AutoScalerConfig(AutoScalerType::DEBOUNCE,[AutoScale\DebouncingAutoScaler::PARAM_SCALE_UP_THRESHOLD => $scaleUpThreshold, AutoScale\DebouncingAutoScaler::PARAM_SCALE_DOWN_THRESHOLD => $scaleDownThreshold]),
+            $this->autoScale
+        );
     }
 
     private function given_the_time_since_last_call_is(?int $timeSinceLastCall) {

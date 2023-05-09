@@ -5,14 +5,14 @@ messenger_auto_scale:
       receivers: "sales*"
       heartbeat_interval: 5
       scalers:
-        - {type: 'min-max', min_procs: 0, max_procs: 5}
-        - {type: 'debounce'}
-        - {type: 'queue-size'}
+        minmax: {type: 'min-max', min_procs: 0, max_procs: 5}
+        debounce: {type: 'debounce'}
+        queue_size: {type: 'queue-size'}
     default:
       backed_up_alert_threshold: 100
       receivers: "*"
       heartbeat_interval: 10
       scalers:
-        - {type: 'min-max', min_procs: 0, max_procs: 5}
-        - {type: 'debounce'}
-        - {type: 'queue-size'}
+        minmax: {type: 'min-max', min_procs: 0, max_procs: 5}
+        debounce: {type: 'debounce'}
+        queue_size: {type: 'queue-size'}

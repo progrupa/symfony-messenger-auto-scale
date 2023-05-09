@@ -4,20 +4,18 @@ namespace Krak\SymfonyMessengerAutoScale\AutoScale;
 
 use Krak\SymfonyMessengerAutoScale\AutoScaler;
 
-final class MinMaxClipAutoScaler extends IntermediateAutoScaler implements AutoScaler
+final class MinMaxClipAutoScaler extends BaseAutoScaler implements AutoScaler
 {
-    private ?int $minProcessCount;
-    private ?int $maxProcessCount;
-
-    public function __construct(AutoScaler $subordinate, ?int $minProcessCount, ?int $maxProcessCount)
-    {
-        parent::__construct($subordinate);
-        $this->minProcessCount = $minProcessCount ?? 0;
-        $this->maxProcessCount = $maxProcessCount;
-    }
+    const PARAM_MIN_PROCESS_COUNT = 'min_process_count';
+    const PARAM_MAX_PROCESS_COUNT = 'max_process_count';
 
     public function scale(AutoScaleRequest $autoScaleRequest): AutoScaleResponse {
         $autoScaleResponse = $this->subordinateScale($autoScaleRequest);
-        return $autoScaleResponse->withExpectedNumProcs(min($this->maxProcessCount, max($autoScaleResponse->expectedNumProcs(), $this->minProcessCount)));
+        return $autoScaleResponse->withExpectedNumProcs(
+            min(
+                $this->config->getParameter(self::PARAM_MAX_PROCESS_COUNT),
+                max($autoScaleResponse->expectedNumProcs(), $this->config->getParameter(self::PARAM_MIN_PROCESS_COUNT))
+            )
+        );
     }
 }

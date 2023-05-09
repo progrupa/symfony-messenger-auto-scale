@@ -4,21 +4,13 @@ namespace Krak\SymfonyMessengerAutoScale\AutoScale;
 
 use Krak\SymfonyMessengerAutoScale\AutoScaler;
 
-final class DebouncingAutoScaler extends IntermediateAutoScaler implements AutoScaler
+final class DebouncingAutoScaler extends BaseAutoScaler implements AutoScaler
 {
     const SCALE_UP = 'up';
     const SCALE_DOWN = 'down';
 
-    /** The time it takes in seconds before we start scaling up over provisioned procs */
-    private int $scaleUpThresholdSeconds;
-    /** The time it takes in seconds before we start scaling down over provisioned procs */
-    private int $scaleDownThresholdSeconds;
-
-    public function __construct(AutoScaler $subordinate, int $scaleUpThresholdSeconds = 0, int $scaleDownThresholdSeconds = 0) {
-        parent::__construct($subordinate);
-        $this->scaleUpThresholdSeconds = $scaleUpThresholdSeconds;
-        $this->scaleDownThresholdSeconds = $scaleDownThresholdSeconds;
-    }
+    const PARAM_SCALE_UP_THRESHOLD = 'scale_up_threshold';
+    const PARAM_SCALE_DOWN_THRESHOLD = 'scale_down_threshold';
 
     public function scale(AutoScaleRequest $autoScaleRequest): AutoScaleResponse {
         $resp = $this->subordinateScale($autoScaleRequest);
@@ -30,8 +22,8 @@ final class DebouncingAutoScaler extends IntermediateAutoScaler implements AutoS
 
         // number of seconds for a scale event to be active before allowing scale event
         $scaleThreshold = $scaleDirection === self::SCALE_UP
-            ? $this->scaleUpThresholdSeconds
-            : $this->scaleDownThresholdSeconds;
+            ? $this->config->getParameter(self::PARAM_SCALE_UP_THRESHOLD)
+            : $this->config->getParameter(self::PARAM_SCALE_DOWN_THRESHOLD);
 
         [$timeSinceNeededScale, $scaleDirectionSinceNeededScale] = $autoScaleRequest->state()['debounce_since_needed_scale'] ?? [null, null];
 

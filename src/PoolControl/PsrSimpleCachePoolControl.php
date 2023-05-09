@@ -2,7 +2,6 @@
 
 namespace Krak\SymfonyMessengerAutoScale\PoolControl;
 
-use Krak\SymfonyMessengerAutoScale\PoolControl;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use Krak\SymfonyMessengerAutoScale\PoolStatus;
 use Psr\SimpleCache\CacheInterface;
@@ -45,10 +44,6 @@ final class PsrSimpleCachePoolControl implements ActorPoolControl, WorkerPoolCon
 
     public function scaleWorkers(int $numWorkers): void {
         $this->cache->set($this->key('num_workers'), $numWorkers);
-    }
-
-    public function updatePoolConfig(?PoolConfig $poolConfig): void {
-        $this->cache->set($this->key('pool_config'), $poolConfig);
     }
 
     public function restart(): void {

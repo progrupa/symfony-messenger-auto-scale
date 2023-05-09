@@ -2,8 +2,9 @@
 
 namespace Krak\SymfonyMessengerAutoScale\Tests\Feature;
 
+use Krak\SymfonyMessengerAutoScale\AutoScale\MinMaxClipAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
 use Krak\SymfonyMessengerAutoScale\PoolControl;
-use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use Krak\SymfonyMessengerAutoScale\PoolStatus;
 use PHPUnit\Framework\TestCase;
 
@@ -43,23 +44,6 @@ abstract class PoolControlTestOutline extends TestCase
         $this->assertEquals(5, $actorPoolControl->getNumWorkers());
         return $tup;
     }
-
-//    /**
-//     * @test
-//     * @depends can_scale_workers
-//     */
-//    public function can_update_pool_config(array $tup) {
-//        /** @var PoolControl\WorkerPoolControl */
-//        /** @var PoolControl\ActorPoolControl */
-//        [$workerPoolControl, $actorPoolControl] = $tup;
-//
-//        $actorPoolControl->updatePoolConfig(new PoolConfig(5, 10, 50));
-//
-//        $this->assertEquals(5, $workerPoolControl->getPoolConfig()->minProcs());
-//        $this->assertEquals(10, $workerPoolControl->getPoolConfig()->maxProcs());
-//        $this->assertEquals(50, $workerPoolControl->getPoolConfig()->messageRate());
-//        return $tup;
-//    }
 
     /**
      * @test

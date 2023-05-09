@@ -3,6 +3,11 @@
 namespace Krak\SymfonyMessengerAutoScale;
 
 use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScaleRequest;
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerType;
+use Krak\SymfonyMessengerAutoScale\AutoScale\DebouncingAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScale\MinMaxClipAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScale\QueueNotEmptyAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
 use Krak\SymfonyMessengerAutoScale\PoolControl\WorkerPoolControl;
 use Symfony\Component\Messenger\Transport\Receiver\MessageCountAwareInterface;
 use Symfony\Component\Messenger\Transport\Receiver\ReceiverInterface;
@@ -31,7 +36,6 @@ final class WorkerPool
         MessageCountAwareInterface $getMessageCount,
         WorkerPoolControl          $poolControl,
         ProcessManager             $processManager,
-        AutoScaler                 $autoScale,
         EventLogger                $logger,
         PoolConfig                 $poolConfig
     ) {
@@ -39,10 +43,11 @@ final class WorkerPool
         $this->getMessageCount = $getMessageCount;
         $this->poolControl = $poolControl;
         $this->processManager = $processManager;
-        $this->autoScale = $autoScale;
         $this->logger = $logger;
         $this->poolConfig = $poolConfig;
         $this->procs = [];
+
+        $this->autoScale = $this->buildAutoScale($poolConfig);
     }
 
     public function manage(?int $timeSinceLastCallInSeconds): void {
@@ -144,5 +149,19 @@ final class WorkerPool
                 yield $this->processManager->createProcess();
             }
         })($this->procs));
+    }
+
+    private function buildAutoScale(PoolConfig $config)
+    {
+        foreach (array_reverse($config->getScalerConfigs()) as $scalerConfig) {
+            $scaler = match ($scalerConfig->getType()) {
+                AutoScalerType::QUEUE_SIZE => new QueueSizeMessageRateAutoScaler($scalerConfig),
+                AutoScalerType::QUEUE_NOT_EMPTY => new QueueNotEmptyAutoScaler($scalerConfig),
+                AutoScalerType::MIN_MAX => new MinMaxClipAutoScaler($scalerConfig, $scaler),
+                AutoScalerType::DEBOUNCE => new DebouncingAutoScaler($scalerConfig, $scaler),
+            };
+        }
+
+        return $scaler;
     }
 }

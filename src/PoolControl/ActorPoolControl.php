@@ -2,6 +2,7 @@
 
 namespace Krak\SymfonyMessengerAutoScale\PoolControl;
 
+use Krak\SymfonyMessengerAutoScale\AutoScalerConfig;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use Krak\SymfonyMessengerAutoScale\PoolControl;
 
@@ -11,7 +12,6 @@ use Krak\SymfonyMessengerAutoScale\PoolControl;
  */
 interface ActorPoolControl extends PoolControl
 {
-//    public function updatePoolConfig(?PoolConfig $poolConfig): void;
     public function restart(): void;
     public function pause(): void;
     public function resume(): void;

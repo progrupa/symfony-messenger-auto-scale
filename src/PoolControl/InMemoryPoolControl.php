@@ -46,10 +46,6 @@ final class InMemoryPoolControl implements ActorPoolControl, WorkerPoolControl
         $this->numWorkers = $numWorkers;
     }
 
-    public function updatePoolConfig(?PoolConfig $poolConfig): void {
-        $this->poolConfig = $poolConfig;
-    }
-
     public function restart(): void {
         $this->shouldStop = true;
     }

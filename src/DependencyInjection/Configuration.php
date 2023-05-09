@@ -33,9 +33,11 @@ class Configuration implements ConfigurationInterface
                                             ->beforeNormalization()->always()->then(fn($v) => strtolower($v))
                                             ->end()
                                         ->end()
+                                        ->integerNode('message_rate')->defaultValue(100)->end()    //  queue size
+                                        ->integerNode('allow_queued')->defaultValue(0)->end()    //  queue not empty
+                                        ->integerNode('allow_queued_per_worker')->defaultValue(0)->end()    //  queue not empty
                                         ->integerNode('min_procs')->end()   //  min-max clip
                                         ->integerNode('max_procs')->end()   //  min-max clip
-                                        ->integerNode('message_rate')->defaultValue(100)->end()    //  queue size
                                         ->integerNode('scale_up_threshold_seconds')->defaultValue(5)->end()  //  debouncing
                                         ->integerNode('scale_down_threshold_seconds')->defaultValue(60)->end()    //  debouncing
                                     ->end()

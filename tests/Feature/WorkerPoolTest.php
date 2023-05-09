@@ -3,8 +3,10 @@
 namespace Krak\SymfonyMessengerAutoScale\Tests\Feature;
 
 use ColinODell\PsrTestLogger\TestLogger;
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerType;
 use Krak\SymfonyMessengerAutoScale\AutoScale\DebouncingAutoScaler;
 use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScalerConfig;
 use Krak\SymfonyMessengerAutoScale\EventLogger;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use Krak\SymfonyMessengerAutoScale\PoolControl\InMemoryPoolControl;
@@ -19,7 +21,7 @@ final class WorkerPoolTest extends TestCase
     private $procManager;
     private $testLogger;
     private $logger;
-    private $autoScale;
+    private $poolConfig;
     private $poolControl;
     /** @var WorkerPool */
     private $workerPool;
@@ -128,9 +130,8 @@ final class WorkerPoolTest extends TestCase
             $this->getMessageCount,
             $this->poolControl,
             $this->procManager,
-            $this->autoScale,
             $this->logger,
-            (new PoolConfig([]))
+            $this->poolConfig,
         );
     }
 
@@ -144,11 +145,16 @@ final class WorkerPoolTest extends TestCase
     }
 
     private function given_there_is_a_queue_size_auto_scale() {
-        $this->autoScale = new QueueSizeMessageRateAutoScaler(1);
+        $this->poolConfig = new PoolConfig([
+            ['type' => AutoScalerType::QUEUE_SIZE, 'message_rate' => 1]
+        ]);
     }
 
     private function given_there_is_a_wrapping_debouncing_auto_scale(): void {
-        $this->autoScale = new DebouncingAutoScaler($this->autoScale, 5);
+        $this->poolConfig = new PoolConfig([
+            ['type' => AutoScalerType::DEBOUNCE, 'scale_up_threshold_seconds' => 5],
+            ['type' => AutoScalerType::QUEUE_SIZE, 'message_rate' => 1]
+        ]);
     }
 
     private function given_the_pool_control_requests_a_restart() {

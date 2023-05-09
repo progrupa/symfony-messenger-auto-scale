@@ -16,7 +16,7 @@ final class SymfonyProcessProcessManager implements ProcessManager
     public function createProcess() {
         $proc = new Process($this->cmd);
         $proc->setTimeout(null)
-            ->disableOutput()
+//            ->disableOutput()
             ->start();
         return $proc;
     }
