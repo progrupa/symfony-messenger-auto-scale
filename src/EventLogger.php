@@ -12,14 +12,14 @@ use Psr\Log\LogLevel;
  */
 final class EventLogger extends AbstractLogger
 {
-    private $logger;
+    private LoggerInterface $logger;
 
     public function __construct(LoggerInterface $logger) {
         $this->logger = $logger;
     }
 
-    public function logEvent(string $message, string $event, array $context = []): void {
-        $this->log(LogLevel::INFO, $message, [
+    public function logEvent(string $message, string $event, array $context = [], string $level = LogLevel::INFO): void {
+        $this->log($level, $message, [
            'messenger_auto_scale_event' => $event,
            'messenger_auto_scale_event_' . $event . '_context' => $context,
         ]);

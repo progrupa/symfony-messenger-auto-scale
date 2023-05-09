@@ -9,6 +9,7 @@ use Krak\SymfonyMessengerAutoScale\AutoScale\MinMaxClipAutoScaler;
 use Krak\SymfonyMessengerAutoScale\AutoScale\QueueNotEmptyAutoScaler;
 use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
 use Krak\SymfonyMessengerAutoScale\PoolControl\WorkerPoolControl;
+use Psr\Log\LogLevel;
 use Symfony\Component\Messenger\Transport\Receiver\MessageCountAwareInterface;
 use Symfony\Component\Messenger\Transport\Receiver\ReceiverInterface;
 
@@ -77,7 +78,7 @@ final class WorkerPool
 
         $this->scaleTo(0);
 
-        $this->logger->logEvent('Pool stopped', 'stopped');
+        $this->logEvent('Pool stopped', 'stopped');
         $this->poolControl->updateStatus(PoolStatus::stopped());
     }
 
@@ -95,7 +96,7 @@ final class WorkerPool
 
         $this->poolControl->scaleWorkers($this->numProcs());
         $this->poolControl->updateStatus(PoolStatus::running(), $sizeOfQueues);
-        $this->logEvent('Running', 'running', ['sizeOfQueues' => $sizeOfQueues]);
+        $this->logEvent('Running', 'running', ['sizeOfQueues' => $sizeOfQueues], LogLevel::INFO);
     }
 
     /** Scales up or down to the expected num procs */
@@ -122,11 +123,19 @@ final class WorkerPool
         $this->poolControl->scaleWorkers($this->numProcs());
     }
 
-    private function logEvent(string $message, string $event, array $context = []): void {
-        $this->logger->logEvent($message, 'pool_'.$event, array_merge([
-            'num_procs' => $this->numProcs(),
-            'pool' => $this->name,
-        ], $context));
+    private function logEvent(string $message, string $event, array $context = [], string $level = LogLevel::NOTICE): void {
+        $this->logger->logEvent(
+            $message,
+            'pool_'.$event,
+            array_merge(
+                [
+                    'num_procs' => $this->numProcs(),
+                    'pool' => $this->name,
+                ],
+                $context
+            ),
+            $level
+        );
     }
 
     private function numProcs(): int {
@@ -142,9 +151,7 @@ final class WorkerPool
                     continue;
                 }
 
-                $this->logEvent('Restarting Process', 'restart_proc', [
-                    'pid' => $this->processManager->getPid($proc),
-                ]);
+                $this->logEvent('Restarting Process', 'restart_proc', ['pid' => $this->processManager->getPid($proc)], LogLevel::WARNING);
                 $this->processManager->killProcess($proc);
                 yield $this->processManager->createProcess();
             }
