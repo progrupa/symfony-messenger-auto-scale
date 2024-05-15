@@ -11,10 +11,10 @@
         <service id="krak.messenger_auto_scale.receiver_to_pool_mapping" class="array">
             <factory class="Krak\SymfonyMessengerAutoScale\DependencyInjection\BuildSupervisorPoolConfigCompilerPass" method="createReceiverToPoolMappingFromArray" />
         </service>
-        <service id="krak.messenger_auto_scale.auto_scale.default" class="Krak\SymfonyMessengerAutoScale\AutoScale">
+        <service id="krak.messenger_auto_scale.auto_scale.default" class="Krak\SymfonyMessengerAutoScale\AutoScaler">
             <factory class="Krak\SymfonyMessengerAutoScale\Supervisor" method="defaultAutoScale" />
         </service>
-        <service id="Krak\SymfonyMessengerAutoScale\AutoScale" alias="krak.messenger_auto_scale.auto_scale.default"/>
+        <service id="Krak\SymfonyMessengerAutoScale\AutoScaler" alias="krak.messenger_auto_scale.auto_scale.default"/>
 
         <!-- Process Manager Factory -->
         <service id="Krak\SymfonyMessengerAutoScale\ProcessManager\SymfonyMessengerProcessManagerFactory"/>
@@ -43,10 +43,10 @@
 
         <service id="Krak\SymfonyMessengerAutoScale\Command\ConsumeCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\AlertCommand"/>
+        <service id="Krak\SymfonyMessengerAutoScale\Command\ShutdownCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\PauseCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\RestartCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\ResumeCommand"/>
-        <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\ShutdownCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\StatusCommand"/>
     </services>
 </container>
