@@ -17,8 +17,9 @@ final class MockProcessManager implements ProcessManager
         return $procId;
     }
 
-    public function killProcess($processRef) {
+    public function killProcess($processRef): bool {
         unset($this->procsById[$processRef]);
+        return true;
     }
 
     public function isProcessRunning($processRef): bool {

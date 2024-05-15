@@ -24,6 +24,9 @@ final class SymfonyMessengerProcessManagerFactory implements ProcessManagerFacto
     public function createFromSupervisorPoolConfig(SupervisorPoolConfig $config): ProcessManager {
         $command = $config->poolConfig()->attributes()['worker_command'] ?? $this->command;
         $options = $config->poolConfig()->attributes()['worker_command_options'] ?? $this->defaultOpts;
-        return new SymfonyProcessProcessManager(array_merge([$this->pathToConsole, $command], $options, $config->receiverIds()));
+        return new SymfonyProcessProcessManager(
+            array_merge([$this->pathToConsole, $command], $options, $config->receiverIds()),
+            $config->poolConfig()->attributes()['idle_kill_threshold'] ?? null
+        );
     }
 }

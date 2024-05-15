@@ -23,6 +23,7 @@ class Configuration implements ConfigurationInterface
                                 ->scalarPrototype()->end()
                             ->end()
                             ->integerNode('backed_up_alert_threshold')->end()
+                            ->integerNode('idle_kill_threshold')->defaultNull()->end()
                             ->integerNode('heartbeat_interval')->defaultValue(60)->end()
                             ->scalarNode('receivers')->end()
                             ->arrayNode('scalers')

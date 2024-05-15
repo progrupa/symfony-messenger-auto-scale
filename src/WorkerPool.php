@@ -110,9 +110,13 @@ final class WorkerPool
     }
 
     private function scaleDown() {
-        $procRef = array_pop($this->procs);
-        $this->processManager->killProcess($procRef);
-        $this->logEvent("Scaling down worker pool", 'scale', ['direction' => 'down']);
+        foreach ($this->procs as $index => $procRef) {
+            if ($this->processManager->killProcess($procRef)) { //  If a process was successfully killed
+                $this->logEvent("Scaling down worker pool", 'scale', ['direction' => 'down']);
+                unset($this->procs[$index]);    //  remove it from process list
+                break;  //  we only kill one in a single pass
+            }
+        }
         $this->poolControl->scaleWorkers($this->numProcs());
     }
 

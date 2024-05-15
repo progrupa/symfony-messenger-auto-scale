@@ -9,7 +9,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class ConsumeCommand extends Command
 {
-    private $supervisor;
+    private Supervisor $supervisor;
 
     public function __construct(Supervisor $supervisor) {
         parent::__construct();

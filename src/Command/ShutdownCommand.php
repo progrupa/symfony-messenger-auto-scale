@@ -1,6 +1,6 @@
 <?php
 
-namespace Krak\SymfonyMessengerAutoScale\Command\Pool;
+namespace Krak\SymfonyMessengerAutoScale\Command;
 
 use Krak\SymfonyMessengerAutoScale\Supervisor;
 use Psr\Cache\CacheItemPoolInterface;

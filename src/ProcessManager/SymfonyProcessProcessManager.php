@@ -7,23 +7,31 @@ use Symfony\Component\Process\Process;
 
 final class SymfonyProcessProcessManager implements ProcessManager
 {
-    private $cmd;
+    private array $cmd;
+    private ?int $idleKillThreshold = null;
 
-    public function __construct(array $cmd) {
+    public function __construct(array $cmd, ?int $idleKillThreshold = null) {
         $this->cmd = $cmd;
+        $this->idleKillThreshold = $idleKillThreshold;
     }
 
     public function createProcess() {
         $proc = new Process($this->cmd);
         $proc->setTimeout(null)
-//            ->disableOutput()
             ->start();
         return $proc;
     }
 
-    public function killProcess($processRef) {
-        /** @var Process $processRef */
-        $processRef->stop();
+    /**
+     * @param Process $processRef
+     * @return bool
+     */
+    public function killProcess($processRef): bool {
+        if (is_null($this->idleKillThreshold) || ((microtime(true) - $processRef->getLastOutputTime()) > $this->idleKillThreshold)) {
+            $processRef->stop();
+            return true;
+        }
+        return false;
     }
 
     public function isProcessRunning($processRef): bool {
