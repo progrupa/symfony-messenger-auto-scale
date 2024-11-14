@@ -46,8 +46,17 @@ final class PoolConfig implements \JsonSerializable
         if (!isset($this->scalerConfigurations[$name])) {
             $scalerConfig = $this->scalers[$name];
             $this->scalerConfigurations[$name] = match ($scalerConfig['type']) {
-                AutoScalerType::QUEUE_SIZE => new AutoScalerConfig($scalerConfig['type'], [QueueSizeMessageRateAutoScaler::PARAM_MESSAGE_RATE => $scalerConfig['message_rate'] ?? 1]),
-                AutoScalerType::QUEUE_NOT_EMPTY => new AutoScalerConfig($scalerConfig['type'], [QueueNotEmptyAutoScaler::PARAM_ALLOWED_OVERFLOW => $scalerConfig['allow_queued'] ?? 5]),
+                AutoScalerType::QUEUE_SIZE => new AutoScalerConfig(
+                    $scalerConfig['type'],
+                    [QueueSizeMessageRateAutoScaler::PARAM_MESSAGE_RATE => $scalerConfig['message_rate'] ?? 1]
+                ),
+                AutoScalerType::QUEUE_NOT_EMPTY => new AutoScalerConfig(
+                    $scalerConfig['type'],
+                    [
+                        QueueNotEmptyAutoScaler::PARAM_ALLOWED_OVERFLOW => $scalerConfig['allow_queued'] ?? 0,
+                        QueueNotEmptyAutoScaler::PARAM_ALLOWED_OVERFLOW_PER_PROC => $scalerConfig['allow_queued_per_worker'] ?? 0
+                    ]
+                ),
                 AutoScalerType::MIN_MAX => new AutoScalerConfig(
                     $scalerConfig['type'],
                     [
