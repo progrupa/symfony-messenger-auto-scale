@@ -3,6 +3,7 @@
 namespace Krak\SymfonyMessengerAutoScale\ProcessManager;
 
 use Krak\SymfonyMessengerAutoScale\ProcessManager;
+use Krak\SymfonyMessengerAutoScale\TerminationDetails;
 use Symfony\Component\Process\Process;
 
 final class SymfonyProcessProcessManager implements ProcessManager
@@ -42,5 +43,17 @@ final class SymfonyProcessProcessManager implements ProcessManager
     public function getPid($processRef): ?int {
         /** @var Process $processRef */
         return $processRef->getPid();
+    }
+
+    public function getTerminationDetails($processRef): TerminationDetails
+    {
+        /** @var Process $processRef */
+        return new TerminationDetails(
+            $processRef->getExitCode(),
+            $processRef->getExitCodeText(),
+            $processRef->hasBeenSignaled() ? $processRef->getTermSignal() : null,
+            $processRef->getOutput(),
+            $processRef->getErrorOutput()
+        );
     }
 }

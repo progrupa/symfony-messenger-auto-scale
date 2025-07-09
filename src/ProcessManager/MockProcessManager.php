@@ -3,6 +3,7 @@
 namespace Krak\SymfonyMessengerAutoScale\ProcessManager;
 
 use Krak\SymfonyMessengerAutoScale\ProcessManager;
+use Krak\SymfonyMessengerAutoScale\TerminationDetails;
 
 final class MockProcessManager implements ProcessManager
 {
@@ -28,6 +29,15 @@ final class MockProcessManager implements ProcessManager
 
     public function getPid($processRef): ?int {
         return $processRef;
+    }
+
+    public function getTerminationDetails($processRef): TerminationDetails {
+        return new TerminationDetails(
+            0,
+            null,
+            'Mock process terminated',
+            ''
+        );
     }
 
     public function stopProcess(int $processId): void {

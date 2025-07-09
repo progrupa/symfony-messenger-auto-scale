@@ -157,7 +157,18 @@ final class WorkerPool
                     continue;
                 }
 
-                $this->logEvent('Restarting Process', 'restart_proc', ['pid' => $this->processManager->getPid($proc)], LogLevel::WARNING);
+                $terminationDetails = $this->processManager->getTerminationDetails($proc);
+                $this->logEvent('Restarting terminated Process',
+                    'restart_proc',
+                    [
+                        'pid' => $this->processManager->getPid($proc),
+                        'exit_code' => $terminationDetails->getExitCode(),
+                        'signal' => $terminationDetails->getSignal(),
+                        'output' => $terminationDetails->getStandardOutput(),
+                        'error_output' => $terminationDetails->getErrorOutput(),
+                    ],
+                    LogLevel::ERROR
+                );
                 $this->processManager->killProcess($proc);
                 yield $this->processManager->createProcess();
             }
