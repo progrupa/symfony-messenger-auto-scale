@@ -2,8 +2,6 @@
 
 namespace Krak\SymfonyMessengerAutoScale\AutoScale;
 
-use Krak\SymfonyMessengerAutoScale\PoolConfig;
-
 final class AutoScaleRequest
 {
     private $state;

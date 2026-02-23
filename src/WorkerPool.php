@@ -63,7 +63,7 @@ final class WorkerPool
         $this->beatHeart($poolConfig, $sizeOfQueues, $timeSinceLastCallInSeconds);
         $this->refreshDeadProcs();
 
-        $resp = $this->autoScale->scale(new AutoScaleRequest($this->autoScaleState, $timeSinceLastCallInSeconds, $this->numProcs(), $sizeOfQueues, $poolConfig));
+        $resp = $this->autoScale->scale(new AutoScaleRequest($this->autoScaleState, $timeSinceLastCallInSeconds, $this->numProcs(), $sizeOfQueues));
         $this->scaleTo($resp->expectedNumProcs());
         $this->autoScaleState = $resp->state();
     }

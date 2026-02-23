@@ -34,9 +34,7 @@ final class MockProcessManager implements ProcessManager
     public function getTerminationDetails($processRef): TerminationDetails {
         return new TerminationDetails(
             0,
-            null,
             'Mock process terminated',
-            ''
         );
     }
 
