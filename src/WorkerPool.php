@@ -193,6 +193,7 @@ final class WorkerPool
 
     private function buildAutoScale(PoolConfig $config)
     {
+        $scaler = null;
         foreach (array_reverse($config->getScalerConfigs()) as $scalerConfig) {
             $scaler = match ($scalerConfig->getType()) {
                 AutoScalerType::QUEUE_SIZE => new QueueSizeMessageRateAutoScaler($scalerConfig),
