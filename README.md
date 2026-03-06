@@ -206,6 +206,8 @@ scalers:
 
 Execution order: `queue-unhandled` calculates ±1 scaling → `debounce` delays rapid changes → `min-max` clips to bounds.
 
+**Important:** Every scaler chain must include at least one base scaler (`queue-size` or `queue-unhandled`). Wrapper scalers (`min-max`, `debounce`) transform the output of another scaler and cannot function alone. The bundle validates this at compile time and throws an error if no base scaler is configured.
+
 ### Defining your own Auto Scale algorithm
 
 If you want to augment or perform your own auto-scaling algorithm, you can implement the AutoScale interface and then update the `Krak\SymfonyMessengerAutoScale\AutoScale` to point to your new auto scale service.

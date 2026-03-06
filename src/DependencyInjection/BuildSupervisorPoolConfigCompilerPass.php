@@ -2,6 +2,7 @@
 
 namespace Krak\SymfonyMessengerAutoScale\DependencyInjection;
 
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerType;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use Krak\SymfonyMessengerAutoScale\SupervisorPoolConfig;
 use Symfony\Bundle\FrameworkBundle;
@@ -54,6 +55,8 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
                 $claimedReceivers[$receiverId] = $poolName;
             }
 
+            $this->validateScalerChain($poolName, $rawPool['scalers'] ?? []);
+
             yield ['name' => $poolName, 'poolConfig' => $rawPool, 'receiverIds' => $receiverIds];
         }
 
@@ -62,6 +65,31 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
             if (count($unmatchedReceivers)) {
                 throw new \LogicException('Some receivers were not matched by the pool config: ' . implode(', ', $unmatchedReceivers));
             }
+        }
+    }
+
+    private function validateScalerChain(string $poolName, array $scalers): void {
+        if (empty($scalers)) {
+            return;
+        }
+
+        $baseTypes = [AutoScalerType::QUEUE_SIZE, AutoScalerType::QUEUE_NOT_EMPTY];
+        $hasBaseScaler = false;
+        foreach ($scalers as $scaler) {
+            if (in_array($scaler['type'], $baseTypes, true)) {
+                $hasBaseScaler = true;
+                break;
+            }
+        }
+
+        if (!$hasBaseScaler) {
+            throw new \LogicException(sprintf(
+                'Pool "%s" has no base scaler. Scalers chain requires at least one base scaler (%s). Wrapper scalers (%s, %s) cannot function alone.',
+                $poolName,
+                implode(', ', $baseTypes),
+                AutoScalerType::MIN_MAX,
+                AutoScalerType::DEBOUNCE
+            ));
         }
     }
 
