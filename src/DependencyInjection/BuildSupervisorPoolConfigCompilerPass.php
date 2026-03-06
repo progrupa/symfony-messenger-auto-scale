@@ -36,6 +36,7 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
     /** @return SupervisorPoolConfig[] */
     private function buildSupervisorPoolConfigs(array $rawPoolConfig, array $availableReceiverNames, ContainerBuilder $container): iterable {
         $claimedReceivers = [];
+        $factoryClasses = $this->getScalerFactoryClasses($container);
 
         foreach ($rawPoolConfig['pools'] as $poolName => $rawPool) {
             $receiverIds = $rawPool['receivers'];
@@ -56,7 +57,7 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
                 $claimedReceivers[$receiverId] = $poolName;
             }
 
-            $this->validateScalerChain($poolName, $rawPool['scalers'] ?? [], $container);
+            $this->validateScalerChain($poolName, $rawPool['scalers'] ?? [], $factoryClasses);
 
             yield ['name' => $poolName, 'poolConfig' => $rawPool, 'receiverIds' => $receiverIds];
         }
@@ -69,12 +70,10 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
         }
     }
 
-    private function validateScalerChain(string $poolName, array $scalers, ContainerBuilder $container): void {
+    private function validateScalerChain(string $poolName, array $scalers, array $factoryClasses): void {
         if (empty($scalers)) {
             return;
         }
-
-        $factoryClasses = $this->getScalerFactoryClasses($container);
 
         $hasBaseScaler = false;
         foreach ($scalers as $scaler) {

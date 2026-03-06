@@ -2,7 +2,7 @@
 
 namespace Krak\SymfonyMessengerAutoScale\AutoScale;
 
-final class MinMaxClipAutoScaler extends BaseAutoScaler implements WrappingAutoScaler
+final class MinMaxClipAutoScaler extends BaseAutoScaler
 {
     const PARAM_MIN_PROCESS_COUNT = 'min_process_count';
     const PARAM_MAX_PROCESS_COUNT = 'max_process_count';

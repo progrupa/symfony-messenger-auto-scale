@@ -2,7 +2,7 @@
 
 namespace Krak\SymfonyMessengerAutoScale\AutoScale;
 
-final class DebouncingAutoScaler extends BaseAutoScaler implements WrappingAutoScaler
+final class DebouncingAutoScaler extends BaseAutoScaler
 {
     const SCALE_UP = 'up';
     const SCALE_DOWN = 'down';

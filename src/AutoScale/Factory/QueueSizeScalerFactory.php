@@ -25,8 +25,7 @@ final class QueueSizeScalerFactory implements AutoScalerFactory
         return new QueueSizeMessageRateAutoScaler(
             new AutoScalerConfig($config->getType(), [
                 QueueSizeMessageRateAutoScaler::PARAM_MESSAGE_RATE => $config->getParameter('message_rate') ?? 1,
-            ]),
-            $subordinate
+            ])
         );
     }
 }

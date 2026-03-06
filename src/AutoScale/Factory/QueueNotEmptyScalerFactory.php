@@ -26,8 +26,7 @@ final class QueueNotEmptyScalerFactory implements AutoScalerFactory
             new AutoScalerConfig($config->getType(), [
                 QueueNotEmptyAutoScaler::PARAM_ALLOWED_OVERFLOW => $config->getParameter('allow_queued') ?? 0,
                 QueueNotEmptyAutoScaler::PARAM_ALLOWED_OVERFLOW_PER_PROC => $config->getParameter('allow_queued_per_worker') ?? 0,
-            ]),
-            $subordinate
+            ])
         );
     }
 }
