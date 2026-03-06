@@ -169,15 +169,75 @@ messenger_auto_scale:
 | 11                 | 0                       | 1                        | 60                    | 6                      | Size of queue maintained over 60 for 5 seconds, so now we can scale up. |
 | 22                 | 0                       | 0                        | 60                    | 6                      | Catalog now goes back to zero after waiting 20 seconds since needing to scale down |
 
+### Available Auto Scale Algorithms
+
+Scalers are configured per pool under the `scalers` key. They are chained together — each scaler wraps the next, forming a pipeline. The order matters: scalers listed first are the outermost (applied last).
+
+#### `queue-size` — Proportional Scaling (default)
+
+Calculates the expected number of workers as `ceil(queueSize / message_rate)`. Scales proportionally to queue depth.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `message_rate` | 100 | Number of messages a single worker can handle per cycle |
+
+```yaml
+scalers:
+  - {type: 'queue-size', message_rate: 100}
+```
+
+#### `queue-unhandled` — Incremental Scaling
+
+Scales workers incrementally (±1) based on whether the queue exceeds an overflow threshold. Adds one worker when the queue is overflowing, removes one when the queue is empty, and holds steady otherwise. This provides smoother, more conservative scaling than proportional scaling.
+
+The overflow threshold is calculated as either a fixed value (`allow_queued`) or relative to the current worker count (`allow_queued_per_worker × numProcs`). If `allow_queued` is set (> 0), it takes precedence.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `allow_queued` | 0 | Fixed overflow threshold. Scale up when queue exceeds this value. |
+| `allow_queued_per_worker` | 0 | Per-worker overflow threshold. Scale up when queue exceeds `value × current workers`. |
+
+```yaml
+scalers:
+  - {type: 'queue-unhandled', allow_queued_per_worker: 10}
+```
+
+With `allow_queued_per_worker: 10` and 3 workers running, the overflow threshold is 30. If the queue has 31+ messages, one worker is added. If the queue is empty, one worker is removed.
+
+#### `min-max` — Clipping
+
+Clips the expected worker count to the configured minimum and maximum. Wraps another scaler.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `min_procs` | — | Minimum number of workers |
+| `max_procs` | — | Maximum number of workers |
+
+#### `debounce` — Debouncing
+
+Prevents rapid scale-up/scale-down oscillation by requiring the scaling decision to persist for a threshold duration before acting.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `scale_up_threshold_seconds` | 5 | Seconds a scale-up decision must persist before applying |
+| `scale_down_threshold_seconds` | 60 | Seconds a scale-down decision must persist before applying |
+
+### Combining Scalers
+
+Scalers are chained in reverse order: the last scaler in the list is the base (runs first), and earlier scalers wrap it. A typical setup:
+
+```yaml
+scalers:
+  - {type: 'min-max', min_procs: 1, max_procs: 10}
+  - {type: 'debounce', scale_up_threshold_seconds: 5, scale_down_threshold_seconds: 5}
+  - {type: 'queue-unhandled', allow_queued_per_worker: 10}
+```
+
+Execution order: `queue-unhandled` calculates ±1 scaling → `debounce` delays rapid changes → `min-max` clips to bounds.
+
 ### Defining your own Auto Scale algorithm
 
-If you want to augment or perform your own auto-scaling algorithm, you can implement the AutoScale interface and then update the `Krak\SymfonyMessengerAutoScale\AutoScale` to point to your new auto scale service. The default service is defined like:
-
-```php
-use Krak\SymfonyMessengerAutoScale\AutoScaler;
-
-$autoScale = new AutoScale\MinMaxClipAutoScaler(new AutoScale\DebouncingAutoScaler(new AutoScale\QueueSizeMessageRateAutoScaler()));
-```
+If you want to augment or perform your own auto-scaling algorithm, you can implement the AutoScale interface and then update the `Krak\SymfonyMessengerAutoScale\AutoScale` to point to your new auto scale service.
 
 ## Worker Busy Guard & Graceful Shutdown
 
