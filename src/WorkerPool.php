@@ -2,12 +2,8 @@
 
 namespace Krak\SymfonyMessengerAutoScale;
 
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerChainBuilder;
 use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScaleRequest;
-use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerType;
-use Krak\SymfonyMessengerAutoScale\AutoScale\DebouncingAutoScaler;
-use Krak\SymfonyMessengerAutoScale\AutoScale\MinMaxClipAutoScaler;
-use Krak\SymfonyMessengerAutoScale\AutoScale\QueueNotEmptyAutoScaler;
-use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
 use Krak\SymfonyMessengerAutoScale\PoolControl\WorkerPoolControl;
 use Psr\Log\LogLevel;
 use Symfony\Component\Messenger\Transport\Receiver\MessageCountAwareInterface;
@@ -38,7 +34,8 @@ final class WorkerPool
         WorkerPoolControl          $poolControl,
         ProcessManager             $processManager,
         EventLogger                $logger,
-        PoolConfig                 $poolConfig
+        PoolConfig                 $poolConfig,
+        AutoScalerChainBuilder     $chainBuilder
     ) {
         $this->name = $name;
         $this->getMessageCount = $getMessageCount;
@@ -48,7 +45,7 @@ final class WorkerPool
         $this->poolConfig = $poolConfig;
         $this->procs = [];
 
-        $this->autoScale = $this->buildAutoScale($poolConfig);
+        $this->autoScale = $chainBuilder->build($poolConfig);
     }
 
     public function manage(?int $timeSinceLastCallInSeconds): void {
@@ -191,18 +188,4 @@ final class WorkerPool
         })($this->procs));
     }
 
-    private function buildAutoScale(PoolConfig $config)
-    {
-        $scaler = null;
-        foreach (array_reverse($config->getScalerConfigs()) as $scalerConfig) {
-            $scaler = match ($scalerConfig->getType()) {
-                AutoScalerType::QUEUE_SIZE => new QueueSizeMessageRateAutoScaler($scalerConfig),
-                AutoScalerType::QUEUE_NOT_EMPTY => new QueueNotEmptyAutoScaler($scalerConfig),
-                AutoScalerType::MIN_MAX => new MinMaxClipAutoScaler($scalerConfig, $scaler),
-                AutoScalerType::DEBOUNCE => new DebouncingAutoScaler($scalerConfig, $scaler),
-            };
-        }
-
-        return $scaler;
-    }
 }

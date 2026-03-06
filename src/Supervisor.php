@@ -2,6 +2,7 @@
 
 namespace Krak\SymfonyMessengerAutoScale;
 
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerChainBuilder;
 use Krak\SymfonyMessengerAutoScale\AutoScale\DebouncingAutoScaler;
 use Krak\SymfonyMessengerAutoScale\AutoScale\MinMaxClipAutoScaler;
 use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
@@ -33,7 +34,8 @@ final class Supervisor
         ContainerInterface     $receiversById,
         CacheItemPoolInterface $appCache,
         array                  $supervisorPoolConfigs,
-        ?LoggerInterface       $logger = null
+        ?LoggerInterface       $logger = null,
+        private AutoScalerChainBuilder $chainBuilder = new AutoScalerChainBuilder()
     ) {
         $this->processManagerFactory = $processManagerFactory;
         $this->poolControlFactory = $poolControlFactory;
@@ -97,7 +99,8 @@ final class Supervisor
                 $this->poolControlFactory->createForWorker($config->name()),
                 $this->processManagerFactory->createFromSupervisorPoolConfig($config),
                 $this->logger,
-                $config->poolConfig()
+                $config->poolConfig(),
+                $this->chainBuilder
             );
         }, $supervisorPoolConfigs);
     }
