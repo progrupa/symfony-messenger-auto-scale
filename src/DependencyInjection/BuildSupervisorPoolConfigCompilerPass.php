@@ -2,7 +2,8 @@
 
 namespace Krak\SymfonyMessengerAutoScale\DependencyInjection;
 
-use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerType;
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerFactory;
+use Krak\SymfonyMessengerAutoScale\MessengerAutoScaleBundle;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use Krak\SymfonyMessengerAutoScale\SupervisorPoolConfig;
 use Symfony\Bundle\FrameworkBundle;
@@ -27,13 +28,13 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
      */
     private function registerMappedPoolConfigData(ContainerBuilder $container, array $availableReceiverNames): void {
         $rawPoolConfig = $container->getParameter('krak.messenger_auto_scale.config.pools');
-        $supervisorPoolConfigs = iterator_to_array($this->buildSupervisorPoolConfigs($rawPoolConfig, $availableReceiverNames));
+        $supervisorPoolConfigs = iterator_to_array($this->buildSupervisorPoolConfigs($rawPoolConfig, $availableReceiverNames, $container));
         $container->findDefinition('krak.messenger_auto_scale.supervisor_pool_configs')->addArgument($supervisorPoolConfigs);
         $container->findDefinition('krak.messenger_auto_scale.receiver_to_pool_mapping')->addArgument($supervisorPoolConfigs);
     }
 
     /** @return SupervisorPoolConfig[] */
-    private function buildSupervisorPoolConfigs(array $rawPoolConfig, array $availableReceiverNames): iterable {
+    private function buildSupervisorPoolConfigs(array $rawPoolConfig, array $availableReceiverNames, ContainerBuilder $container): iterable {
         $claimedReceivers = [];
 
         foreach ($rawPoolConfig['pools'] as $poolName => $rawPool) {
@@ -55,7 +56,7 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
                 $claimedReceivers[$receiverId] = $poolName;
             }
 
-            $this->validateScalerChain($poolName, $rawPool['scalers'] ?? []);
+            $this->validateScalerChain($poolName, $rawPool['scalers'] ?? [], $container);
 
             yield ['name' => $poolName, 'poolConfig' => $rawPool, 'receiverIds' => $receiverIds];
         }
@@ -68,29 +69,45 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
         }
     }
 
-    private function validateScalerChain(string $poolName, array $scalers): void {
+    private function validateScalerChain(string $poolName, array $scalers, ContainerBuilder $container): void {
         if (empty($scalers)) {
             return;
         }
 
-        $baseTypes = [AutoScalerType::QUEUE_SIZE, AutoScalerType::QUEUE_NOT_EMPTY];
+        $factoryClasses = $this->getScalerFactoryClasses($container);
+
         $hasBaseScaler = false;
         foreach ($scalers as $scaler) {
-            if (in_array($scaler['type'], $baseTypes, true)) {
+            $type = $scaler['type'];
+            if (!isset($factoryClasses[$type])) {
+                throw new \LogicException(sprintf(
+                    'Pool "%s" references unknown scaler type "%s". Available types: %s',
+                    $poolName, $type, implode(', ', array_keys($factoryClasses))
+                ));
+            }
+            if (!$factoryClasses[$type]::isWrapping()) {
                 $hasBaseScaler = true;
-                break;
             }
         }
 
         if (!$hasBaseScaler) {
             throw new \LogicException(sprintf(
-                'Pool "%s" has no base scaler. Scalers chain requires at least one base scaler (%s). Wrapper scalers (%s, %s) cannot function alone.',
-                $poolName,
-                implode(', ', $baseTypes),
-                AutoScalerType::MIN_MAX,
-                AutoScalerType::DEBOUNCE
+                'Pool "%s" has no base scaler. The scaler chain requires at least one non-wrapping scaler.',
+                $poolName
             ));
         }
+    }
+
+    /** @return array<string, class-string<AutoScalerFactory>> type => factory class */
+    private function getScalerFactoryClasses(ContainerBuilder $container): array
+    {
+        $factories = [];
+        foreach ($container->findTaggedServiceIds(MessengerAutoScaleBundle::TAG_SCALER_FACTORY) as $id => $tags) {
+            $class = $container->getDefinition($id)->getClass() ?? $id;
+            $type = $class::getType();
+            $factories[$type] = $class;
+        }
+        return $factories;
     }
 
     private function findAvailableReceiverNames(ContainerBuilder $container): array {
