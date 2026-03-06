@@ -76,7 +76,19 @@ final class WorkerPool
         $this->logEvent('Stopping Pool', 'stopping');
         $this->poolControl->updateStatus(PoolStatus::stopping());
 
-        $this->scaleTo(0, false);
+        $deadline = $this->poolConfig->attributes()['stop_deadline'] ?? 300;
+        $this->scaleTo(0, $deadline);
+
+        // Force-kill any workers still running after the deadline
+        foreach ($this->procs as $index => $procRef) {
+            if ($this->processManager->isProcessRunning($procRef)) {
+                $this->logEvent('Force-killing worker after stop deadline', 'force_kill', [
+                    'pid' => $this->processManager->getPid($procRef),
+                ]);
+                $this->processManager->forceKill($procRef);
+            }
+            unset($this->procs[$index]);
+        }
 
         $this->logEvent('Pool stopped', 'stopped');
         $this->poolControl->updateStatus(PoolStatus::stopped());
@@ -100,14 +112,16 @@ final class WorkerPool
     }
 
     /** Scales up or down to the expected num procs */
-    private function scaleTo(int $expectedNumProcs, bool $timeout = true): void {
+    private function scaleTo(int $expectedNumProcs, int $timeout = 5): void {
         while ($expectedNumProcs > $this->numProcs()) {
             $this->scaleUp();
         }
         $now = microtime(true);
-        //  Try scaling down for 5 seconds, workers might still be busy
-        while ($expectedNumProcs < $this->numProcs() && ($timeout == false || ((microtime(true) - $now) < 5))) {
+        while ($expectedNumProcs < $this->numProcs() && (microtime(true) - $now) < $timeout) {
             $this->scaleDown();
+            if ($expectedNumProcs < $this->numProcs()) {
+                usleep(500_000); // avoid tight-looping when workers are busy
+            }
         }
     }
 
