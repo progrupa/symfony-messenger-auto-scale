@@ -51,5 +51,16 @@
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\RestartCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\ResumeCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\Pool\StatusCommand"/>
+
+        <!-- Scaler Factories -->
+        <service id="Krak\SymfonyMessengerAutoScale\AutoScale\Factory\QueueSizeScalerFactory"/>
+        <service id="Krak\SymfonyMessengerAutoScale\AutoScale\Factory\QueueNotEmptyScalerFactory"/>
+        <service id="Krak\SymfonyMessengerAutoScale\AutoScale\Factory\MinMaxScalerFactory"/>
+        <service id="Krak\SymfonyMessengerAutoScale\AutoScale\Factory\DebouncingScalerFactory"/>
+
+        <!-- Scaler Chain Builder -->
+        <service id="Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerChainBuilder">
+            <argument type="tagged_iterator" tag="messenger_auto_scale.scaler_factory"/>
+        </service>
     </services>
 </container>
