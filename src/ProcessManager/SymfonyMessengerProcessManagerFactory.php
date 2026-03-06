@@ -2,6 +2,7 @@
 
 namespace Krak\SymfonyMessengerAutoScale\ProcessManager;
 
+use Krak\SymfonyMessengerAutoScale\BusyWorkerManager;
 use Krak\SymfonyMessengerAutoScale\ProcessManager;
 use Krak\SymfonyMessengerAutoScale\ProcessManagerFactory;
 use Krak\SymfonyMessengerAutoScale\SupervisorPoolConfig;
@@ -14,13 +15,13 @@ final class SymfonyMessengerProcessManagerFactory implements ProcessManagerFacto
     private $pathToConsole;
     private $command;
     private $defaultOpts;
-    private ?string $busyDir;
+    private BusyWorkerManager $busyWorkerManager;
 
-    public function __construct(string $pathToConsole, string $command = 'messenger:consume', array $defaultOpts = [], ?string $busyDir = null) {
+    public function __construct(string $pathToConsole, BusyWorkerManager $busyWorkerManager, string $command = 'messenger:consume', array $defaultOpts = []) {
         $this->pathToConsole = $pathToConsole;
+        $this->busyWorkerManager = $busyWorkerManager;
         $this->command = $command;
         $this->defaultOpts = $defaultOpts;
-        $this->busyDir = $busyDir;
     }
 
     public function createFromSupervisorPoolConfig(SupervisorPoolConfig $config): ProcessManager {
@@ -29,7 +30,7 @@ final class SymfonyMessengerProcessManagerFactory implements ProcessManagerFacto
         return new SymfonyProcessProcessManager(
             array_merge([PHP_BINARY, $this->pathToConsole, $command], $options, $config->receiverIds()),
             $config->poolConfig()->attributes()['idle_kill_threshold'] ?? null,
-            $this->busyDir
+            $this->busyWorkerManager
         );
     }
 }

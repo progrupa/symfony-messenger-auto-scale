@@ -241,19 +241,21 @@ If you want to augment or perform your own auto-scaling algorithm, you can imple
 
 ## Worker Busy Guard & Graceful Shutdown
 
-When scaling down or shutting down, the supervisor needs to avoid killing workers that are mid-message. This is handled via a **busy-file protocol** using PID files on the filesystem.
+When scaling down or shutting down, the supervisor needs to avoid killing workers that are mid-message. The bundle provides a `BusyWorkerManager` interface and a file-based default implementation (`PidFileManager`) to coordinate this.
 
 ### How It Works
 
-1. Your application creates an event subscriber that touches a file at `<busy_dir>/<worker-pid>` when a worker starts handling a message, and removes it when the message is handled (or fails).
-2. The supervisor checks for this file before killing a worker. If the file exists, the kill is refused — the worker is busy.
-3. During shutdown, the supervisor retries every 500ms until workers finish their messages and can be killed normally.
+1. The bundle registers a `BusyWorkerManager` service (default: `PidFileManager`) that tracks worker busy state.
+2. The bundle's `WorkerBusyGuard` event subscriber automatically calls `markBusy()` when a worker starts handling a message and `markIdle()` when the message is handled (or fails). On worker startup, it calls `cleanup()` to remove stale entries from crashed workers.
+3. The supervisor checks `isProcessBusy($pid)` before killing a worker. If the worker is busy, the kill is refused.
+4. During shutdown, the supervisor retries every 500ms until workers finish their messages and can be killed normally.
 
 ### Configuration
 
 ```yaml
 messenger_auto_scale:
-  busy_dir: '%kernel.project_dir%/var/messenger-workers'
+  busy_dir: '%kernel.project_dir%/var/run'  # default
+  busy_file_prefix: 'messenger-busy-'       # default
   pools:
     default:
       receivers: '*'
@@ -261,7 +263,9 @@ messenger_auto_scale:
       # ...
 ```
 
-**`busy_dir`** (root-level): Directory where worker PID files are stored. Both the supervisor and the worker event subscriber must use the same directory. Set to `null` to disable busy-file checking (workers can be killed at any time).
+**`busy_dir`** (root-level): Directory where the default `PidFileManager` stores busy-state files. Default: `%kernel.project_dir%/var/run`.
+
+**`busy_file_prefix`** (root-level): Prefix for busy-state filenames. With the default prefix, a worker with PID 12345 creates a file named `messenger-busy-12345`. This prevents collisions when the directory is shared with other PID files. Default: `messenger-busy-`.
 
 **`stop_deadline`** (per-pool): Maximum seconds to wait for busy workers during shutdown before force-killing them.
 
@@ -273,53 +277,29 @@ messenger_auto_scale:
 
 ### Application-Side Setup
 
-You need to create a Symfony Messenger event subscriber in your application that manages the busy files. Example:
+No application-side setup is required. The bundle registers a `WorkerBusyGuard` event subscriber that automatically signals `markBusy()` / `markIdle()` on Messenger worker events and runs `cleanup()` on worker startup.
+
+### Custom BusyWorkerManager Implementation
+
+The default `PidFileManager` uses the filesystem. If you need a different storage backend (e.g., Redis), implement the `BusyWorkerManager` interface:
 
 ```php
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
-use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
-use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
-use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
-use Symfony\Component\Messenger\Event\WorkerStoppedEvent;
+use Krak\SymfonyMessengerAutoScale\BusyWorkerManager;
 
-class WorkerBusyGuard
+class RedisBusyWorkerManager implements BusyWorkerManager
 {
-    public function __construct(private readonly string $busyDir) {}
-
-    #[AsEventListener(event: WorkerMessageReceivedEvent::class)]
-    public function onMessageReceived(WorkerMessageReceivedEvent $event): void
-    {
-        if (!is_dir($this->busyDir)) {
-            @mkdir($this->busyDir, 0755, true);
-        }
-        @file_put_contents($this->busyDir . '/' . getmypid(), (string) time());
-    }
-
-    #[AsEventListener(event: WorkerMessageHandledEvent::class)]
-    public function onMessageHandled(WorkerMessageHandledEvent $event): void
-    {
-        @unlink($this->busyDir . '/' . getmypid());
-    }
-
-    #[AsEventListener(event: WorkerMessageFailedEvent::class)]
-    public function onMessageFailed(WorkerMessageFailedEvent $event): void
-    {
-        @unlink($this->busyDir . '/' . getmypid());
-    }
-
-    #[AsEventListener(event: WorkerStoppedEvent::class)]
-    public function onWorkerStopped(): void
-    {
-        @unlink($this->busyDir . '/' . getmypid());
-    }
+    public function markBusy(): void { /* ... */ }
+    public function markIdle(): void { /* ... */ }
+    public function isProcessBusy(int $pid): bool { /* ... */ }
+    public function cleanup(): void { /* ... */ }
 }
 ```
 
-Wire the `$busyDir` constructor argument to the same value as the bundle's `busy_dir` config.
+Register it as a service — Symfony's autowiring will pick your implementation over the bundle's default alias. The `busy_dir` and `busy_file_prefix` config options are ignored when using a custom implementation.
 
 ### Scale-Down vs Shutdown
 
-Both scale-down and shutdown use the same busy-file guard, but differ in timeout behavior:
+Both scale-down and shutdown use the same busy worker guard, but differ in timeout behavior:
 
 - **Scale-down** (normal operation): Uses a 5-second timeout. If workers are still busy after 5 seconds, the supervisor gives up and retries on the next auto-scale cycle.
 - **Shutdown** (deployment/SIGTERM): Uses the `stop_deadline` timeout. After the deadline, remaining workers are force-killed (unless `stop_deadline` is `null`).

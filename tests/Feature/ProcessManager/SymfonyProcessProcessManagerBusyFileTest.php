@@ -2,6 +2,7 @@
 
 namespace Krak\SymfonyMessengerAutoScale\Tests\Feature\ProcessManager;
 
+use Krak\SymfonyMessengerAutoScale\PidFileManager;
 use Krak\SymfonyMessengerAutoScale\ProcessManager\SymfonyProcessProcessManager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
@@ -9,6 +10,7 @@ use Symfony\Component\Process\Process;
 final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
 {
     private string $busyDir;
+    private string $prefix = 'messenger-busy-';
 
     protected function setUp(): void
     {
@@ -22,23 +24,29 @@ final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
         @rmdir($this->busyDir);
     }
 
+    private function createPidFileManager(): PidFileManager
+    {
+        return new PidFileManager($this->busyDir, $this->prefix);
+    }
+
     public function testKillRefusedWhenBusyFileExists(): void
     {
+        $pidFileManager = $this->createPidFileManager();
         $pm = new SymfonyProcessProcessManager(
             [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: null,
-            busyDir: $this->busyDir
+            busyWorkerManager: $pidFileManager
         );
         $proc = $pm->createProcess();
         $pid = $proc->getPid();
 
-        file_put_contents($this->busyDir . '/' . $pid, (string) time());
+        file_put_contents($this->busyDir . '/' . $this->prefix . $pid, (string) time());
 
         $killed = $pm->killProcess($proc);
         $this->assertFalse($killed);
         $this->assertTrue($proc->isRunning());
 
-        unlink($this->busyDir . '/' . $pid);
+        unlink($this->busyDir . '/' . $this->prefix . $pid);
         $proc->stop();
     }
 
@@ -47,20 +55,7 @@ final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
         $pm = new SymfonyProcessProcessManager(
             [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: null,
-            busyDir: $this->busyDir
-        );
-        $proc = $pm->createProcess();
-
-        $killed = $pm->killProcess($proc);
-        $this->assertTrue($killed);
-    }
-
-    public function testKillAllowedWhenNoBusyDir(): void
-    {
-        $pm = new SymfonyProcessProcessManager(
-            [PHP_BINARY, '-r', 'sleep(60);'],
-            idleKillThreshold: null,
-            busyDir: null
+            busyWorkerManager: $this->createPidFileManager()
         );
         $proc = $pm->createProcess();
 
@@ -70,40 +65,42 @@ final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
 
     public function testBusyFileAndIdleThresholdCombined(): void
     {
+        $pidFileManager = $this->createPidFileManager();
         $pm = new SymfonyProcessProcessManager(
             [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: 0,
-            busyDir: $this->busyDir
+            busyWorkerManager: $pidFileManager
         );
         $proc = $pm->createProcess();
         $pid = $proc->getPid();
         usleep(50_000);
 
-        file_put_contents($this->busyDir . '/' . $pid, (string) time());
+        file_put_contents($this->busyDir . '/' . $this->prefix . $pid, (string) time());
 
         $killed = $pm->killProcess($proc);
         $this->assertFalse($killed, 'Should refuse kill when busy file exists, even if idle threshold passed');
 
-        unlink($this->busyDir . '/' . $pid);
+        unlink($this->busyDir . '/' . $this->prefix . $pid);
         $proc->stop();
     }
 
     public function testForceKillIgnoresBusyFile(): void
     {
+        $pidFileManager = $this->createPidFileManager();
         $pm = new SymfonyProcessProcessManager(
             [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: null,
-            busyDir: $this->busyDir
+            busyWorkerManager: $pidFileManager
         );
         $proc = $pm->createProcess();
         $pid = $proc->getPid();
 
-        file_put_contents($this->busyDir . '/' . $pid, (string) time());
+        file_put_contents($this->busyDir . '/' . $this->prefix . $pid, (string) time());
 
         $pm->forceKill($proc);
         usleep(100_000);
         $this->assertFalse($proc->isRunning());
 
-        @unlink($this->busyDir . '/' . $pid);
+        @unlink($this->busyDir . '/' . $this->prefix . $pid);
     }
 }

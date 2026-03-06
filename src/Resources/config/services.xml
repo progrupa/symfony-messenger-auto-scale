@@ -41,6 +41,9 @@
             <tag name="monolog.logger" channel="messenger_auto_scale"/>
         </service>
 
+        <!-- Worker Busy Guard -->
+        <service id="Krak\SymfonyMessengerAutoScale\EventSubscriber\WorkerBusyGuard"/>
+
         <service id="Krak\SymfonyMessengerAutoScale\Command\ConsumeCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\AlertCommand"/>
         <service id="Krak\SymfonyMessengerAutoScale\Command\ShutdownCommand"/>

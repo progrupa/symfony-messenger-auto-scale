@@ -2,6 +2,7 @@
 
 namespace Krak\SymfonyMessengerAutoScale\ProcessManager;
 
+use Krak\SymfonyMessengerAutoScale\BusyWorkerManager;
 use Krak\SymfonyMessengerAutoScale\ProcessManager;
 use Krak\SymfonyMessengerAutoScale\TerminationDetails;
 use Symfony\Component\Process\Process;
@@ -10,12 +11,12 @@ final class SymfonyProcessProcessManager implements ProcessManager
 {
     private array $cmd;
     private ?int $idleKillThreshold;
-    private ?string $busyDir;
+    private BusyWorkerManager $busyWorkerManager;
 
-    public function __construct(array $cmd, ?int $idleKillThreshold = null, ?string $busyDir = null) {
+    public function __construct(array $cmd, ?int $idleKillThreshold, BusyWorkerManager $busyWorkerManager) {
         $this->cmd = $cmd;
         $this->idleKillThreshold = $idleKillThreshold;
-        $this->busyDir = $busyDir;
+        $this->busyWorkerManager = $busyWorkerManager;
     }
 
     public function createProcess() {
@@ -52,16 +53,12 @@ final class SymfonyProcessProcessManager implements ProcessManager
 
     private function isWorkerBusy(Process $processRef): bool
     {
-        if ($this->busyDir === null) {
-            return false;
-        }
-
         $pid = $processRef->getPid();
         if ($pid === null) {
             return false;
         }
 
-        return file_exists($this->busyDir . '/' . $pid);
+        return $this->busyWorkerManager->isProcessBusy($pid);
     }
 
     public function isProcessRunning($processRef): bool {
