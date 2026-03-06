@@ -99,7 +99,6 @@ final class WorkerPoolShutdownTest extends TestCase
 class CountdownProcessManager implements ProcessManager
 {
     public int $forceKillCount = 0;
-    public int $queueSize = 10;
     private array $procs = [];
     private int $busyForIterations;
     private array $killAttempts = [];

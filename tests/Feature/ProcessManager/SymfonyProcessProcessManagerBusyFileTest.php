@@ -25,7 +25,7 @@ final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
     public function testKillRefusedWhenBusyFileExists(): void
     {
         $pm = new SymfonyProcessProcessManager(
-            ['php8.1', '-r', 'sleep(60);'],
+            [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: null,
             busyDir: $this->busyDir
         );
@@ -45,7 +45,7 @@ final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
     public function testKillAllowedWhenNoBusyFile(): void
     {
         $pm = new SymfonyProcessProcessManager(
-            ['php8.1', '-r', 'sleep(60);'],
+            [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: null,
             busyDir: $this->busyDir
         );
@@ -58,7 +58,7 @@ final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
     public function testKillAllowedWhenNoBusyDir(): void
     {
         $pm = new SymfonyProcessProcessManager(
-            ['php8.1', '-r', 'sleep(60);'],
+            [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: null,
             busyDir: null
         );
@@ -71,7 +71,7 @@ final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
     public function testBusyFileAndIdleThresholdCombined(): void
     {
         $pm = new SymfonyProcessProcessManager(
-            ['php8.1', '-r', 'sleep(60);'],
+            [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: 0,
             busyDir: $this->busyDir
         );
@@ -91,7 +91,7 @@ final class SymfonyProcessProcessManagerBusyFileTest extends TestCase
     public function testForceKillIgnoresBusyFile(): void
     {
         $pm = new SymfonyProcessProcessManager(
-            ['php8.1', '-r', 'sleep(60);'],
+            [PHP_BINARY, '-r', 'sleep(60);'],
             idleKillThreshold: null,
             busyDir: $this->busyDir
         );
