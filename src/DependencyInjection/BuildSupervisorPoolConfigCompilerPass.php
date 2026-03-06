@@ -2,7 +2,6 @@
 
 namespace Krak\SymfonyMessengerAutoScale\DependencyInjection;
 
-use Krak\SymfonyMessengerAutoScale\Internal\Glob;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use Krak\SymfonyMessengerAutoScale\SupervisorPoolConfig;
 use Symfony\Bundle\FrameworkBundle;
@@ -13,9 +12,9 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterface
 {
     public function process(ContainerBuilder $container) {
-        $receiverNames = $this->findReceiverNamesSortedByPriorityAndPosition($container);
-        $this->registerMappedPoolConfigData($container, $receiverNames);
-        $container->setParameter('messenger_auto_scale.receiver_names', $receiverNames);
+        $availableReceiverNames = $this->findAvailableReceiverNames($container);
+        $this->registerMappedPoolConfigData($container, $availableReceiverNames);
+        $container->setParameter('messenger_auto_scale.receiver_names', $availableReceiverNames);
     }
 
     /**
@@ -25,66 +24,55 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
      * @see BuildSupervisorPoolConfigCompilerPass::createSupervisorPoolConfigsFromArray()
      * @see BuildSupervisorPoolConfigCompilerPass::createReceiverToPoolMappingFromArray()
      */
-    private function registerMappedPoolConfigData(ContainerBuilder $container, array $receiverNames): void {
+    private function registerMappedPoolConfigData(ContainerBuilder $container, array $availableReceiverNames): void {
         $rawPoolConfig = $container->getParameter('krak.messenger_auto_scale.config.pools');
-        $supervisorPoolConfigs = iterator_to_array($this->buildSupervisorPoolConfigs($rawPoolConfig, $receiverNames));
+        $supervisorPoolConfigs = iterator_to_array($this->buildSupervisorPoolConfigs($rawPoolConfig, $availableReceiverNames));
         $container->findDefinition('krak.messenger_auto_scale.supervisor_pool_configs')->addArgument($supervisorPoolConfigs);
         $container->findDefinition('krak.messenger_auto_scale.receiver_to_pool_mapping')->addArgument($supervisorPoolConfigs);
     }
 
     /** @return SupervisorPoolConfig[] */
-    private function buildSupervisorPoolConfigs(array $rawPoolConfig, array $receiverNames): iterable {
+    private function buildSupervisorPoolConfigs(array $rawPoolConfig, array $availableReceiverNames): iterable {
+        $claimedReceivers = [];
+
         foreach ($rawPoolConfig['pools'] as $poolName => $rawPool) {
-            if (!count($receiverNames)) {
-                throw new \LogicException('No receivers/transports are left to match pool config - ' . $poolName);
+            $receiverIds = $rawPool['receivers'];
+
+            foreach ($receiverIds as $receiverId) {
+                if (!in_array($receiverId, $availableReceiverNames, true)) {
+                    throw new \LogicException(sprintf(
+                        'Pool "%s" references receiver "%s" which is not defined in framework.messenger.transports. Available: %s',
+                        $poolName, $receiverId, implode(', ', $availableReceiverNames)
+                    ));
+                }
+                if (isset($claimedReceivers[$receiverId])) {
+                    throw new \LogicException(sprintf(
+                        'Pool "%s" references receiver "%s" which is already claimed by pool "%s". A receiver can only belong to one pool.',
+                        $poolName, $receiverId, $claimedReceivers[$receiverId]
+                    ));
+                }
+                $claimedReceivers[$receiverId] = $poolName;
             }
 
-            [$matchedReceiverNames, $receiverNames] = $this->matchReceiverNameFromRawPool($rawPool, $receiverNames);
-            yield ['name' => $poolName, 'poolConfig' => $rawPool, 'receiverIds' => $matchedReceiverNames];
+            yield ['name' => $poolName, 'poolConfig' => $rawPool, 'receiverIds' => $receiverIds];
         }
 
-        if (count($receiverNames) && $rawPoolConfig['must_match_all_receivers']) {
-            throw new \LogicException('Some receivers were not matched by the pool config: ' . implode(', ', $receiverNames));
+        if ($rawPoolConfig['must_match_all_receivers']) {
+            $unmatchedReceivers = array_diff($availableReceiverNames, array_keys($claimedReceivers));
+            if (count($unmatchedReceivers)) {
+                throw new \LogicException('Some receivers were not matched by the pool config: ' . implode(', ', $unmatchedReceivers));
+            }
         }
     }
 
-    /** return the matched receiver names and unmatched recevier names as a two tuple. */
-    private function matchReceiverNameFromRawPool(array $rawPool, array $receiverNames): array {
-        $matched = [];
-        $unmatched = [];
-        $glob = new Glob($rawPool['receivers']);
-        foreach ($receiverNames as $receiverName)  {
-            if ($glob->matches($receiverName)) {
-                $matched[] = $receiverName;
-            } else {
-                $unmatched[] = $receiverName;
-            }
-        }
-
-        return [$matched, $unmatched];
-    }
-
-    private function findReceiverNamesSortedByPriorityAndPosition(ContainerBuilder $container): array {
+    private function findAvailableReceiverNames(ContainerBuilder $container): array {
         $frameworkConfig = (new Processor())->processConfiguration(
             new FrameworkBundle\DependencyInjection\Configuration($container->getParameter('kernel.debug')),
             $container->getExtensionConfig('framework')
         );
         $transports = $frameworkConfig['messenger']['transports'] ?? [];
-        $receiverNamesToSort = [];
-        $position = 0;
-        foreach ($transports as $transportName => $config) {
-            $receiverNamesToSort[] = [
-                'name' => $transportName,
-                'priority' => $config['options']['priority'] ?? 0,
-                'position' => $position
-            ];
-            $position += 1;
-        }
-        usort($receiverNamesToSort, function(array $a, array $b) {
-            // sort by priority desc, position asc
-            return ($b['priority'] <=> $a['priority']) ?: ($a['position'] <=> $b['position']);
-        });
-        return array_column($receiverNamesToSort, 'name');
+
+        return array_keys($transports);
     }
 
     public static function createSupervisorPoolConfigsFromArray(array $poolConfigs): array {
