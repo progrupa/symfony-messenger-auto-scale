@@ -206,11 +206,78 @@ scalers:
 
 Execution order: `queue-unhandled` calculates ±1 scaling → `debounce` delays rapid changes → `min-max` clips to bounds.
 
-**Important:** Every scaler chain must include at least one base scaler (`queue-size` or `queue-unhandled`). Wrapper scalers (`min-max`, `debounce`) transform the output of another scaler and cannot function alone. The bundle validates this at compile time and throws an error if no base scaler is configured.
+**Important:** Every scaler chain must include at least one base scaler (a factory where `isWrapping()` returns `false`). Wrapping scalers require a subordinate and cannot function alone. The bundle validates this at compile time.
 
-### Defining your own Auto Scale algorithm
+### Custom Scalers
 
-If you want to augment or perform your own auto-scaling algorithm, you can implement the AutoScale interface and then update the `Krak\SymfonyMessengerAutoScale\AutoScale` to point to your new auto scale service.
+You can register custom scaler types by implementing the `AutoScalerFactory` interface. The bundle autoconfigures any service implementing this interface — no manual tagging required.
+
+**1. Create your scaler:**
+
+```php
+use Krak\SymfonyMessengerAutoScale\AutoScale\BaseAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScaleRequest;
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScaleResponse;
+
+class TimeOfDayScaler extends BaseAutoScaler
+{
+    public function scale(AutoScaleRequest $request): AutoScaleResponse
+    {
+        $hour = (int) date('H');
+        $peakMultiplier = $this->config->getParameter('peak_multiplier');
+        $offPeakMultiplier = $this->config->getParameter('off_peak_multiplier');
+        $multiplier = ($hour >= 9 && $hour <= 17) ? $peakMultiplier : $offPeakMultiplier;
+        return new AutoScaleResponse($request->state(), (int) ceil($request->numProcs() * $multiplier));
+    }
+}
+```
+
+**2. Create the factory:**
+
+```php
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerFactory;
+use Krak\SymfonyMessengerAutoScale\AutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScalerConfig;
+
+class TimeOfDayScalerFactory implements AutoScalerFactory
+{
+    public static function getType(): string
+    {
+        return 'time-of-day';
+    }
+
+    public static function isWrapping(): bool
+    {
+        return false; // This is a base scaler
+    }
+
+    public function create(AutoScalerConfig $config, ?AutoScaler $subordinate): AutoScaler
+    {
+        return new TimeOfDayScaler(
+            new AutoScalerConfig($config->getType(), [
+                'peak_multiplier' => $config->getParameter('peak_multiplier') ?? 1.0,
+                'off_peak_multiplier' => $config->getParameter('off_peak_multiplier') ?? 0.3,
+            ]),
+            $subordinate
+        );
+    }
+}
+```
+
+**3. Use in config:**
+
+```yaml
+messenger_auto_scale:
+  pools:
+    async:
+      receivers: ['async']
+      scalers:
+        - {type: 'min-max', min_procs: 1, max_procs: 20}
+        - {type: 'debounce'}
+        - {type: 'time-of-day', peak_multiplier: 1.0, off_peak_multiplier: 0.3}
+```
+
+The factory is automatically discovered and registered. Custom scalers follow the same chaining rules as built-in scalers — wrapping scalers (`isWrapping(): true`) require a subordinate, base scalers don't.
 
 ## Worker Busy Guard & Graceful Shutdown
 
