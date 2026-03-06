@@ -1,4 +1,4 @@
 messenger_auto_scale:
   pools:
     sales:
-      receivers: "sales*"
+      receivers: ['sales', 'sales_order']

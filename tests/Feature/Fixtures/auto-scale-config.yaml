@@ -2,7 +2,7 @@ messenger_auto_scale:
   console_path: '%kernel.project_dir%/tests/Feature/Fixtures/console'
   pools:
     sales:
-      receivers: "sales*"
+      receivers: ['sales', 'sales_order']
       heartbeat_interval: 5
       scalers:
         minmax: {type: 'min-max', min_procs: 0, max_procs: 5}
@@ -10,7 +10,7 @@ messenger_auto_scale:
         queue_size: {type: 'queue-size'}
     default:
       backed_up_alert_threshold: 100
-      receivers: "*"
+      receivers: ['catalog']
       heartbeat_interval: 10
       scalers:
         minmax: {type: 'min-max', min_procs: 0, max_procs: 5}

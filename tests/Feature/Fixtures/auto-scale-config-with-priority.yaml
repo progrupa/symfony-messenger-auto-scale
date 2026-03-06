@@ -2,7 +2,7 @@ messenger_auto_scale:
   console_path: '%kernel.project_dir%/tests/Feature/Fixtures/console'
   pools:
     catalog:
-      receivers: "catalog*"
+      receivers: ['catalog_highest', 'catalog_high', 'catalog', 'catalog_low']
       heartbeat_interval: 5
       scalers:
         - {type: 'min-max', min_procs: 0, max_procs: 5}

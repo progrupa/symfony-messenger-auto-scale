@@ -49,7 +49,7 @@ final class BundleTest extends KernelTestCase
     }
 
     /** @test */
-    public function supervisor_pool_config_receiver_ids_are_sorted_off_of_transport_priority_option() {
+    public function supervisor_pool_config_preserves_explicit_receiver_order() {
         $this->given_the_kernel_is_booted_with_config($this->messengerAndAutoScaleConfigWithPriority());
         $this->when_the_requires_supervisor_pool_configs_is_created();
         $this->then_the_supervisor_pool_configs_match([
