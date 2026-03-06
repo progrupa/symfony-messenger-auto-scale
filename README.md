@@ -32,79 +32,50 @@ messenger_auto_scale:
     sales:
       min_procs: 0
       max_procs: 5
-      receivers: "sales*"
+      receivers: ['sales', 'sales_order']
       heartbeat_interval: 5
     default:
       min_procs: 0
       max_procs: 5
       backed_up_alert_threshold: 100
-      receivers: "*"
+      receivers: ['catalog']
       heartbeat_interval: 10
 ```
 
 Once configured, you can start the consumer with the `krak:auto-scale:consume` command which will start up and manage the worker pools.
 
-## Matching Receivers
+## Configuring Receivers
 
-Each pool config must have a `receivers` property which is a simple Glob that will match any of the current transport names setup in the messenger config.
+Each pool must have a `receivers` property — an array of transport names that the pool's workers will consume from.
 
-It's important to note, that a receiver can ONLY be apart of one pool. So if two pools have receiver patterns that match the same receiver, then the first defined pool would own that receiver.
+```yaml
+messenger_auto_scale:
+  pools:
+    sales:
+      receivers: ['sales', 'sales_order']
+    default:
+      receivers: ['catalog']
+```
 
 ### Receiver Priority
 
-By default, if a pool matches more than one receiver, the order in which the receivers are defined in the framework messenger configuration will be the order in which they are consumed.
+The order of receivers in the array determines consumption priority. Workers process messages from the first receiver before moving to the next. In the example above, `sales` messages are consumed before `sales_order` messages.
 
-Let's look at an example:
-
-```yaml
-# auto scale config
-messenger_auto_scale:
-  pools:
-    default:
-      receivers: '*' # this will match all receivers defined
-
-# messenger config
-framework:
-  messenger:
-    transports:
-      transport1: ''
-      transport2: ''
-      transport3: ''
+This maps directly to the order of arguments passed to `messenger:consume`:
+```
+console messenger:consume sales sales_order
 ```
 
-Every worker in the pool will first process messages in transport1, then once empty, they will look at transport2, and so on. Essentially, we're making a call to the messenger consume command like: `console messenger:consume transport1 transport2 transport3`
+### Receiver Validation
 
-If you'd like to be a bit more explicit about receiver priority, then you can define the priority option on your transport which will ensure that receivers with the highest priority will get processed before receivers with lower priority. If two receivers have the same priority, then the order in which they are defined will take precedent.
+Each receiver name must correspond to a transport defined in `framework.messenger.transports`. An error is thrown at compile time if:
 
-Let's look at an example:
-
-```yaml
-# auto scale config
-messenger_auto_scale:
-  pools:
-    default:
-      receivers: '*' # this will match all receivers defined
-
-# messenger config
-framework:
-  messenger:
-    transports:
-      transport3:
-        dsn: ''
-        options: { priority: -1 }
-      transport1:
-        dsn: ''
-        options: { priority: 1 }
-      transport2: '' # default priority is 0
-```
-
-This would have the same effect as the above configuration. Even though the transports are defined in a different order, the priority option ensures they are in the same order as above.
+- A receiver name doesn't match any defined transport
+- The same receiver appears in more than one pool
 
 ### Disabling Must Match All Receivers
 
-By default, the bundle will throw an exception if any receivers are not matched by the pool config. This is to help prevent any unexpected bugs where you the receiver name is for some reason not matched by a pool when you expected it to.
-
-To disable this check, update the `must_match_all_receivers` config option to false:
+By default, the bundle throws an exception if any transports are not listed in at least one pool. To allow unmanaged transports:
 
 ```yaml
 messenger_auto_scale:
@@ -150,13 +121,13 @@ messenger_auto_scale:
       message_rate: 100
       scale_up_threshold_seconds: 5
       scale_down_threshold_seconds: 20
-      receivers: "catalog"
+      receivers: ['catalog']
     sales:
       min_procs:  5
       message_rate: 10
       scale_up_threshold_seconds: 5
       scale_down_threshold_seconds: 20
-      receivers: "sales"
+      receivers: ['sales']
 ```
 
 | Seconds from Start | Catalog Pool Queue Size | Catalog Pool Num Workers | Sales Pool Queue Size | Sales Pool Num Workers | Notes |
@@ -258,7 +229,7 @@ messenger_auto_scale:
   busy_file_prefix: 'messenger-busy-'       # default
   pools:
     default:
-      receivers: '*'
+      receivers: ['transport1', 'transport2']
       stop_deadline: 300  # seconds to wait before force-killing (default: null)
       # ...
 ```
@@ -341,6 +312,37 @@ When installing this as a bundle in a symfony app, it can be helpful to provide 
 ### Receiver To Pool Names Array
 
 `krak.messenger_auto_scale.receiver_to_pool_mapping` stores `array<string, string>` which maps the messenger reciever ids to the auto scale pool names.
+
+## Migrating from Glob Receivers
+
+In previous versions, `receivers` was a glob pattern string. It is now an explicit array of transport names.
+
+**Before:**
+```yaml
+messenger_auto_scale:
+  pools:
+    sales:
+      receivers: "sales*"
+    default:
+      receivers: "*"
+```
+
+**After:**
+```yaml
+messenger_auto_scale:
+  pools:
+    sales:
+      receivers: ['sales', 'sales_order']
+    default:
+      receivers: ['catalog']
+```
+
+**Key changes:**
+- `receivers` is now a required array of strings (not a glob pattern)
+- Array order determines consumption priority (first = highest priority)
+- Transport-level `options.priority` is no longer read by the bundle
+- Each receiver name is validated against `framework.messenger.transports` at compile time
+- A receiver can still only belong to one pool
 
 ## Testing
 
