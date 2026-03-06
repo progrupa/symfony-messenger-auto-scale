@@ -9,11 +9,13 @@ use Symfony\Component\Process\Process;
 final class SymfonyProcessProcessManager implements ProcessManager
 {
     private array $cmd;
-    private ?int $idleKillThreshold = null;
+    private ?int $idleKillThreshold;
+    private ?string $busyDir;
 
-    public function __construct(array $cmd, ?int $idleKillThreshold = null) {
+    public function __construct(array $cmd, ?int $idleKillThreshold = null, ?string $busyDir = null) {
         $this->cmd = $cmd;
         $this->idleKillThreshold = $idleKillThreshold;
+        $this->busyDir = $busyDir;
     }
 
     public function createProcess() {
@@ -28,11 +30,38 @@ final class SymfonyProcessProcessManager implements ProcessManager
      * @return bool
      */
     public function killProcess($processRef): bool {
-        if (is_null($this->idleKillThreshold) || ((microtime(true) - $processRef->getLastOutputTime()) > $this->idleKillThreshold)) {
-            $processRef->stop();
-            return true;
+        if ($this->isWorkerBusy($processRef)) {
+            return false;
         }
-        return false;
+
+        if (!is_null($this->idleKillThreshold)
+            && (microtime(true) - $processRef->getLastOutputTime()) <= $this->idleKillThreshold) {
+            return false;
+        }
+
+        $processRef->stop();
+        return true;
+    }
+
+    /**
+     * @param Process $processRef
+     */
+    public function forceKill($processRef): void {
+        $processRef->stop(0);
+    }
+
+    private function isWorkerBusy(Process $processRef): bool
+    {
+        if ($this->busyDir === null) {
+            return false;
+        }
+
+        $pid = $processRef->getPid();
+        if ($pid === null) {
+            return false;
+        }
+
+        return file_exists($this->busyDir . '/' . $pid);
     }
 
     public function isProcessRunning($processRef): bool {
