@@ -29,6 +29,7 @@ class Configuration implements ConfigurationInterface
                             ->integerNode('backed_up_alert_threshold')->end()
                             ->integerNode('idle_kill_threshold')->defaultNull()->end()
                             ->integerNode('heartbeat_interval')->defaultValue(60)->end()
+                            ->integerNode('stop_deadline')->defaultValue(300)->info('Seconds to wait for busy workers before force-killing during shutdown.')->end()
                             ->scalarNode('receivers')->end()
                             ->arrayNode('scalers')
                                 ->arrayPrototype()
