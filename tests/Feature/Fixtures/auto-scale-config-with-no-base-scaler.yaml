@@ -1,0 +1,8 @@
+messenger_auto_scale:
+  must_match_all_receivers: false
+  pools:
+    default:
+      receivers: ['catalog']
+      scalers:
+        - {type: 'min-max', min_procs: 1, max_procs: 5}
+        - {type: 'debounce'}
