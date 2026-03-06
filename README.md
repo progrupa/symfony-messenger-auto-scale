@@ -179,6 +179,91 @@ use Krak\SymfonyMessengerAutoScale\AutoScaler;
 $autoScale = new AutoScale\MinMaxClipAutoScaler(new AutoScale\DebouncingAutoScaler(new AutoScale\QueueSizeMessageRateAutoScaler()));
 ```
 
+## Worker Busy Guard & Graceful Shutdown
+
+When scaling down or shutting down, the supervisor needs to avoid killing workers that are mid-message. This is handled via a **busy-file protocol** using PID files on the filesystem.
+
+### How It Works
+
+1. Your application creates an event subscriber that touches a file at `<busy_dir>/<worker-pid>` when a worker starts handling a message, and removes it when the message is handled (or fails).
+2. The supervisor checks for this file before killing a worker. If the file exists, the kill is refused — the worker is busy.
+3. During shutdown, the supervisor retries every 500ms until workers finish their messages and can be killed normally.
+
+### Configuration
+
+```yaml
+messenger_auto_scale:
+  busy_dir: '%kernel.project_dir%/var/messenger-workers'
+  pools:
+    default:
+      receivers: '*'
+      stop_deadline: 300  # seconds to wait before force-killing (default: null)
+      # ...
+```
+
+**`busy_dir`** (root-level): Directory where worker PID files are stored. Both the supervisor and the worker event subscriber must use the same directory. Set to `null` to disable busy-file checking (workers can be killed at any time).
+
+**`stop_deadline`** (per-pool): Maximum seconds to wait for busy workers during shutdown before force-killing them.
+
+| Value | Behavior |
+|-------|----------|
+| `null` (default) | Wait indefinitely — never force-kill. Workers are only stopped once they finish their current message. |
+| `0` | Force-kill immediately — no grace period. |
+| `300` | Wait up to 5 minutes, then force-kill any remaining workers. |
+
+### Application-Side Setup
+
+You need to create a Symfony Messenger event subscriber in your application that manages the busy files. Example:
+
+```php
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerStoppedEvent;
+
+class WorkerBusyGuard
+{
+    public function __construct(private readonly string $busyDir) {}
+
+    #[AsEventListener(event: WorkerMessageReceivedEvent::class)]
+    public function onMessageReceived(WorkerMessageReceivedEvent $event): void
+    {
+        if (!is_dir($this->busyDir)) {
+            @mkdir($this->busyDir, 0755, true);
+        }
+        @file_put_contents($this->busyDir . '/' . getmypid(), (string) time());
+    }
+
+    #[AsEventListener(event: WorkerMessageHandledEvent::class)]
+    public function onMessageHandled(WorkerMessageHandledEvent $event): void
+    {
+        @unlink($this->busyDir . '/' . getmypid());
+    }
+
+    #[AsEventListener(event: WorkerMessageFailedEvent::class)]
+    public function onMessageFailed(WorkerMessageFailedEvent $event): void
+    {
+        @unlink($this->busyDir . '/' . getmypid());
+    }
+
+    #[AsEventListener(event: WorkerStoppedEvent::class)]
+    public function onWorkerStopped(): void
+    {
+        @unlink($this->busyDir . '/' . getmypid());
+    }
+}
+```
+
+Wire the `$busyDir` constructor argument to the same value as the bundle's `busy_dir` config.
+
+### Scale-Down vs Shutdown
+
+Both scale-down and shutdown use the same busy-file guard, but differ in timeout behavior:
+
+- **Scale-down** (normal operation): Uses a 5-second timeout. If workers are still busy after 5 seconds, the supervisor gives up and retries on the next auto-scale cycle.
+- **Shutdown** (deployment/SIGTERM): Uses the `stop_deadline` timeout. After the deadline, remaining workers are force-killed (unless `stop_deadline` is `null`).
+
 ## Alerts
 
 The alerting system is designed to be flexible and allow each user define alerts as they see. Alerts are simply just events that get dispatched when a certain metric is reached as determined by the services that implement `RaiseAlerts`.

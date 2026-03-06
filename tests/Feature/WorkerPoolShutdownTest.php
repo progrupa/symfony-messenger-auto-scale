@@ -64,9 +64,25 @@ final class WorkerPoolShutdownTest extends TestCase
         $this->assertSame(2, $pm->forceKillCount);
     }
 
+    public function testNullDeadlineWaitsIndefinitelyAndNeverForceKills(): void
+    {
+        // Worker becomes idle after 3 iterations
+        $pm = new CountdownProcessManager(busyForIterations: 3);
+        $pool = $this->createPool($pm, stopDeadline: null);
+
+        $pool->manage(null);
+        $this->assertSame(2, $pm->runningCount());
+
+        $pool->stop();
+
+        // Workers should be stopped gracefully — no force-kills
+        $this->assertSame(0, $pm->runningCount());
+        $this->assertSame(0, $pm->forceKillCount);
+    }
+
     private function createPool(
         ProcessManager $pm,
-        int $stopDeadline = 300,
+        ?int $stopDeadline = 300,
         int $minProcs = 2,
         int $maxProcs = 2,
     ): WorkerPool {
