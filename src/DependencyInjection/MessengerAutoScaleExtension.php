@@ -23,7 +23,8 @@ class MessengerAutoScaleExtension extends Extension
         // processed pool config to be accessible as a parameter.
         $container->setParameter('krak.messenger_auto_scale.config.pools', $processedConfig);
         $container->findDefinition(SymfonyMessengerProcessManagerFactory::class)
-            ->addArgument($processedConfig['console_path']);
+            ->addArgument($processedConfig['console_path'])
+            ->setArgument('$busyDir', $processedConfig['busy_dir'] ?? null);
     }
 
     private function loadServices(ContainerBuilder $container): void {

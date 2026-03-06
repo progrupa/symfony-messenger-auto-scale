@@ -14,11 +14,13 @@ final class SymfonyMessengerProcessManagerFactory implements ProcessManagerFacto
     private $pathToConsole;
     private $command;
     private $defaultOpts;
+    private ?string $busyDir;
 
-    public function __construct(string $pathToConsole, string $command = 'messenger:consume', array $defaultOpts = []) {
+    public function __construct(string $pathToConsole, string $command = 'messenger:consume', array $defaultOpts = [], ?string $busyDir = null) {
         $this->pathToConsole = $pathToConsole;
         $this->command = $command;
         $this->defaultOpts = $defaultOpts;
+        $this->busyDir = $busyDir;
     }
 
     public function createFromSupervisorPoolConfig(SupervisorPoolConfig $config): ProcessManager {
@@ -26,7 +28,8 @@ final class SymfonyMessengerProcessManagerFactory implements ProcessManagerFacto
         $options = $config->poolConfig()->attributes()['worker_command_options'] ?? $this->defaultOpts;
         return new SymfonyProcessProcessManager(
             array_merge([$this->pathToConsole, $command], $options, $config->receiverIds()),
-            $config->poolConfig()->attributes()['idle_kill_threshold'] ?? null
+            $config->poolConfig()->attributes()['idle_kill_threshold'] ?? null,
+            $this->busyDir
         );
     }
 }
