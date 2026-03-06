@@ -6,6 +6,9 @@ use ColinODell\PsrTestLogger\TestLogger;
 use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerType;
 use Krak\SymfonyMessengerAutoScale\AutoScale\DebouncingAutoScaler;
 use Krak\SymfonyMessengerAutoScale\AutoScale\QueueSizeMessageRateAutoScaler;
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerChainBuilder;
+use Krak\SymfonyMessengerAutoScale\AutoScale\Factory\QueueSizeScalerFactory;
+use Krak\SymfonyMessengerAutoScale\AutoScale\Factory\DebouncingScalerFactory;
 use Krak\SymfonyMessengerAutoScale\AutoScalerConfig;
 use Krak\SymfonyMessengerAutoScale\EventLogger;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
@@ -132,7 +135,16 @@ final class WorkerPoolTest extends TestCase
             $this->procManager,
             $this->logger,
             $this->poolConfig,
+            $this->createChainBuilder(),
         );
+    }
+
+    private function createChainBuilder(): AutoScalerChainBuilder
+    {
+        return new AutoScalerChainBuilder([
+            new QueueSizeScalerFactory(),
+            new DebouncingScalerFactory(),
+        ]);
     }
 
     private function given_there_is_a_running_worker_pool_with_num_procs(int $numProcs = 5, ?callable $initAutoScale = null) {

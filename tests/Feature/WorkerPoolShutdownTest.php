@@ -2,6 +2,9 @@
 
 namespace Krak\SymfonyMessengerAutoScale\Tests\Feature;
 
+use Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerChainBuilder;
+use Krak\SymfonyMessengerAutoScale\AutoScale\Factory\QueueNotEmptyScalerFactory;
+use Krak\SymfonyMessengerAutoScale\AutoScale\Factory\MinMaxScalerFactory;
 use Krak\SymfonyMessengerAutoScale\EventLogger;
 use Krak\SymfonyMessengerAutoScale\PoolConfig;
 use Psr\Log\NullLogger;
@@ -104,7 +107,12 @@ final class WorkerPoolShutdownTest extends TestCase
             ['stop_deadline' => $stopDeadline]
         );
 
-        return new WorkerPool('test', $messageCount, $poolControl, $pm, $logger, $config);
+        $chainBuilder = new AutoScalerChainBuilder([
+            new MinMaxScalerFactory(),
+            new QueueNotEmptyScalerFactory(),
+        ]);
+
+        return new WorkerPool('test', $messageCount, $poolControl, $pm, $logger, $config, $chainBuilder);
     }
 }
 
