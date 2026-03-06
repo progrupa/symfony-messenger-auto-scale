@@ -84,6 +84,13 @@ final class BundleTest extends KernelTestCase
 
     private function given_the_message_info_file_is_reset() {
         @unlink(__DIR__ . '/Fixtures/_message-info.txt');
+        // Purge stale messages from Redis streams left over from previous test runs
+        $redis = new \Redis();
+        $redis->connect('127.0.0.1', 6379);
+        foreach (['catalog', 'sales', 'sales_order'] as $queue) {
+            $redis->del("messages_{$queue}");
+            $redis->del($queue);
+        }
     }
 
     private function given_the_kernel_is_booted_with_config(array $configFiles) {
@@ -116,7 +123,7 @@ final class BundleTest extends KernelTestCase
     }
 
     private function given_the_supervisor_is_started() {
-        $this->proc = new Process([__DIR__ . '/Fixtures/console', 'krak:auto-scale:consume']);
+        $this->proc = new Process([PHP_BINARY, __DIR__ . '/Fixtures/console', 'krak:auto-scale:consume']);
         $this->proc
             ->setTimeout(null)
             ->disableOutput()

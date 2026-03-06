@@ -27,7 +27,7 @@ final class SymfonyMessengerProcessManagerFactory implements ProcessManagerFacto
         $command = $config->poolConfig()->attributes()['worker_command'] ?? $this->command;
         $options = $config->poolConfig()->attributes()['worker_command_options'] ?? $this->defaultOpts;
         return new SymfonyProcessProcessManager(
-            array_merge([$this->pathToConsole, $command], $options, $config->receiverIds()),
+            array_merge([PHP_BINARY, $this->pathToConsole, $command], $options, $config->receiverIds()),
             $config->poolConfig()->attributes()['idle_kill_threshold'] ?? null,
             $this->busyDir
         );
