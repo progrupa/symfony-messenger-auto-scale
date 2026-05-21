@@ -39,7 +39,11 @@ final class BuildSupervisorPoolConfigCompilerPass implements CompilerPassInterfa
         $factoryClasses = $this->getScalerFactoryClasses($container);
 
         foreach ($rawPoolConfig['pools'] as $poolName => $rawPool) {
-            $receiverIds = $rawPool['receivers'];
+            //  Dedupe — the same pool config loaded via two paths (e.g. Symfony
+            //  package glob + explicit `imports:`) appends receivers on merge,
+            //  producing harmless duplicates that the cross-pool claim check
+            //  below would otherwise mistake for a real conflict.
+            $receiverIds = array_values(array_unique($rawPool['receivers']));
 
             foreach ($receiverIds as $receiverId) {
                 if (!in_array($receiverId, $availableReceiverNames, true)) {
