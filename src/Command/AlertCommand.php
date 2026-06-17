@@ -21,12 +21,12 @@ final class AlertCommand extends Command
         $this->supervisorPoolConfigs = $supervisorPoolConfigs;
     }
 
-    protected function configure() {
+    protected function configure(): void {
         $this->setName('krak:auto-scale:alert')
             ->setDescription('Raise any of the configured alerts.');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output) {
+    protected function execute(InputInterface $input, OutputInterface $output): int {
         foreach ($this->supervisorPoolConfigs as $poolConfig) {
             foreach (($this->raiseAlerts)($poolConfig) as $event) {
                 $this->eventDispatcher->dispatch($event);

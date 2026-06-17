@@ -11,7 +11,7 @@ class MessengerAutoScaleBundle extends Bundle
     const TAG_RAISE_ALERTS = 'messenger_auto_scale.raise_alerts';
     const TAG_SCALER_FACTORY = 'messenger_auto_scale.scaler_factory';
 
-    public function build(ContainerBuilder $container) {
+    public function build(ContainerBuilder $container): void {
         parent::build($container);
 
         $container->addCompilerPass(new DependencyInjection\BuildSupervisorPoolConfigCompilerPass());

@@ -11,7 +11,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class StatusCommand extends PoolCommand
 {
-    protected function configure() {
+    protected function configure(): void {
         $this->setName('krak:auto-scale:pool:status')
             ->setDescription('Show the status of the selected pool (or all if no pool name is given).')
             ->addPoolArgument('The names of the pools to display the status')
@@ -19,7 +19,7 @@ final class StatusCommand extends PoolCommand
             ->addOption('poll-interval', 'i', InputOption::VALUE_REQUIRED, 'The interval to poll at, defaults to 5 seconds', 5);
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output) {
+    protected function execute(InputInterface $input, OutputInterface $output): int {
         $poolNames = $this->getPoolNames($input);
         $shouldPoll = $input->getOption('poll');
         $pollInterval = $input->getOption('poll-interval');

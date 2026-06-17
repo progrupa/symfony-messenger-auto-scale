@@ -1,0 +1,75 @@
+services:
+    _defaults:
+        public: false
+        autowire: true
+        autoconfigure: true
+        bind:
+            $receiversById: '@messenger.receiver_locator'
+            $supervisorPoolConfigs: '@krak.messenger_auto_scale.supervisor_pool_configs'
+
+    krak.messenger_auto_scale.supervisor_pool_configs:
+        class: array
+        factory: ['Krak\SymfonyMessengerAutoScale\DependencyInjection\BuildSupervisorPoolConfigCompilerPass', 'createSupervisorPoolConfigsFromArray']
+
+    krak.messenger_auto_scale.receiver_to_pool_mapping:
+        class: array
+        factory: ['Krak\SymfonyMessengerAutoScale\DependencyInjection\BuildSupervisorPoolConfigCompilerPass', 'createReceiverToPoolMappingFromArray']
+
+    krak.messenger_auto_scale.auto_scale.default:
+        class: Krak\SymfonyMessengerAutoScale\AutoScaler
+        factory: ['Krak\SymfonyMessengerAutoScale\Supervisor', 'defaultAutoScale']
+
+    Krak\SymfonyMessengerAutoScale\AutoScaler:
+        alias: krak.messenger_auto_scale.auto_scale.default
+
+    Krak\SymfonyMessengerAutoScale\ProcessManager\SymfonyMessengerProcessManagerFactory: ~
+
+    Krak\SymfonyMessengerAutoScale\ProcessManagerFactory:
+        alias: Krak\SymfonyMessengerAutoScale\ProcessManager\SymfonyMessengerProcessManagerFactory
+
+    Krak\SymfonyMessengerAutoScale\PoolControl\InMemoryPoolControlFactory: ~
+
+    Krak\SymfonyMessengerAutoScale\PoolControl\PsrSimpleCachePoolControlFactory.simple_cache:
+        class: Symfony\Component\Cache\Psr16Cache
+        arguments:
+            - '@Psr\Cache\CacheItemPoolInterface'
+
+    Krak\SymfonyMessengerAutoScale\PoolControl\PsrSimpleCachePoolControlFactory:
+        arguments:
+            - '@Krak\SymfonyMessengerAutoScale\PoolControl\PsrSimpleCachePoolControlFactory.simple_cache'
+
+    Krak\SymfonyMessengerAutoScale\PoolControlFactory:
+        alias: Krak\SymfonyMessengerAutoScale\PoolControl\PsrSimpleCachePoolControlFactory
+
+    Krak\SymfonyMessengerAutoScale\RaiseAlerts\PoolBackedUpRaiseAlerts: ~
+
+    Krak\SymfonyMessengerAutoScale\RaiseAlerts\ChainRaiseAlerts:
+        autoconfigure: false
+        arguments:
+            - !tagged_iterator messenger_auto_scale.raise_alerts
+
+    Krak\SymfonyMessengerAutoScale\RaiseAlerts:
+        alias: Krak\SymfonyMessengerAutoScale\RaiseAlerts\ChainRaiseAlerts
+
+    Krak\SymfonyMessengerAutoScale\Supervisor:
+        tags:
+            - { name: monolog.logger, channel: messenger_auto_scale }
+
+    Krak\SymfonyMessengerAutoScale\EventSubscriber\WorkerBusyGuard: ~
+
+    Krak\SymfonyMessengerAutoScale\Command\ConsumeCommand: ~
+    Krak\SymfonyMessengerAutoScale\Command\AlertCommand: ~
+    Krak\SymfonyMessengerAutoScale\Command\ShutdownCommand: ~
+    Krak\SymfonyMessengerAutoScale\Command\Pool\PauseCommand: ~
+    Krak\SymfonyMessengerAutoScale\Command\Pool\RestartCommand: ~
+    Krak\SymfonyMessengerAutoScale\Command\Pool\ResumeCommand: ~
+    Krak\SymfonyMessengerAutoScale\Command\Pool\StatusCommand: ~
+
+    Krak\SymfonyMessengerAutoScale\AutoScale\Factory\QueueSizeScalerFactory: ~
+    Krak\SymfonyMessengerAutoScale\AutoScale\Factory\QueueNotEmptyScalerFactory: ~
+    Krak\SymfonyMessengerAutoScale\AutoScale\Factory\MinMaxScalerFactory: ~
+    Krak\SymfonyMessengerAutoScale\AutoScale\Factory\DebouncingScalerFactory: ~
+
+    Krak\SymfonyMessengerAutoScale\AutoScale\AutoScalerChainBuilder:
+        arguments:
+            - !tagged_iterator messenger_auto_scale.scaler_factory
