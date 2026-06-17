@@ -7,13 +7,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class ResumeCommand extends PoolCommand
 {
-    protected function configure() {
+    protected function configure(): void {
         $this->setName('krak:auto-scale:pool:resume')
             ->setDescription('Request a resume for the selected pools')
             ->addPoolArgument('The names of the pools to perform a resume');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output) {
+    protected function execute(InputInterface $input, OutputInterface $output): int {
         $poolNames = $this->getPoolNames($input);
         foreach ($poolNames as $poolName) {
             $control = $this->poolControlFactory->createForActor($poolName);

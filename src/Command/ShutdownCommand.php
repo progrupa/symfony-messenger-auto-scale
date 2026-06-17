@@ -20,7 +20,7 @@ class ShutdownCommand extends Command
     }
 
 
-    protected function configure() {
+    protected function configure(): void {
         $this->setName('krak:auto-scale:shutdown')
             ->setDescription('Request a shutdown of the worker pool supervisor');
     }
