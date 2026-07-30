@@ -60,6 +60,7 @@ services:
     Krak\SymfonyMessengerAutoScale\Command\ConsumeCommand: ~
     Krak\SymfonyMessengerAutoScale\Command\AlertCommand: ~
     Krak\SymfonyMessengerAutoScale\Command\ShutdownCommand: ~
+    Krak\SymfonyMessengerAutoScale\Command\DrainStatusCommand: ~
     Krak\SymfonyMessengerAutoScale\Command\Pool\PauseCommand: ~
     Krak\SymfonyMessengerAutoScale\Command\Pool\RestartCommand: ~
     Krak\SymfonyMessengerAutoScale\Command\Pool\ResumeCommand: ~

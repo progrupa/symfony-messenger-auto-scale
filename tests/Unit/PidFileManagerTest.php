@@ -69,6 +69,48 @@ final class PidFileManagerTest extends TestCase
         $this->assertFalse($manager->isProcessBusy(999999999));
     }
 
+    public function testBusyPidsReportsOnlyLiveMarkers(): void
+    {
+        mkdir($this->pidDir, 0755, true);
+
+        // A live marker (this process) plus two markers whose processes are gone.
+        // A stale marker reported as busy would make a drain gate wait forever, so
+        // the liveness filter is the whole contract here.
+        file_put_contents($this->pidDir . '/' . $this->prefix . getmypid(), (string) time());
+        file_put_contents($this->pidDir . '/' . $this->prefix . '999999901', (string) time());
+        file_put_contents($this->pidDir . '/' . $this->prefix . '999999902', (string) time());
+        // Unprefixed files belong to someone else and must be ignored entirely.
+        file_put_contents($this->pidDir . '/other-file.pid', '123');
+
+        $manager = new PidFileManager($this->pidDir, $this->prefix);
+
+        $this->assertSame([getmypid()], $manager->busyPids());
+    }
+
+    public function testBusyPidsIsEmptyWhenNoWorkerHasEverBeenBusy(): void
+    {
+        // markBusy() creates the directory lazily, so an absent directory means
+        // "no worker in this container has taken a message" -- a legitimate
+        // not-busy, not an error.
+        $manager = new PidFileManager($this->pidDir, $this->prefix);
+
+        $this->assertDirectoryDoesNotExist($this->pidDir);
+        $this->assertSame([], $manager->busyPids());
+    }
+
+    public function testBusyPidsTracksMarkBusyAndMarkIdle(): void
+    {
+        $manager = new PidFileManager($this->pidDir, $this->prefix);
+
+        $this->assertSame([], $manager->busyPids());
+
+        $manager->markBusy();
+        $this->assertSame([getmypid()], $manager->busyPids());
+
+        $manager->markIdle();
+        $this->assertSame([], $manager->busyPids());
+    }
+
     public function testCleanupRemovesStalePrefixedFiles(): void
     {
         mkdir($this->pidDir, 0755, true);

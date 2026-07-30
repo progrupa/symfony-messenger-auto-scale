@@ -13,6 +13,7 @@ final class SymfonyProcessProcessManagerTest extends ProcessManagerTestOutline
             public function markBusy(): void {}
             public function markIdle(): void {}
             public function isProcessBusy(int $pid): bool { return false; }
+            public function busyPids(): array { return []; }
             public function cleanup(): void {}
         };
 

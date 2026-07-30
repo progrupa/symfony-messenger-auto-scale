@@ -61,8 +61,32 @@ final class Supervisor
             $this->checkShutdown();
         }
 
+        $this->stopPools($workerPools);
+    }
+
+    /**
+     * Tear every pool down in two phases rather than pool-by-pool.
+     *
+     * Stopping pools sequentially left `scheduler_default` untouched while
+     * `async` waited out its stragglers: its own idle workers stayed alive for no
+     * reason, and its deadline only started counting once async's had elapsed.
+     * Phase 1 releases every idle worker in every pool immediately; phase 2 then
+     * waits off a SHARED clock, so the pools' deadlines overlap instead of
+     * summing.
+     *
+     * Net effect: teardown costs roughly "the longest single in-flight message"
+     * rather than "sum over pools of (workers x 500ms + deadline)".
+     *
+     * @param WorkerPool[] $workerPools
+     */
+    private function stopPools(array $workerPools): void {
         foreach ($workerPools as $pool) {
-            $pool->stop();
+            $pool->beginStop();
+        }
+
+        $teardownStartedAt = microtime(true);
+        foreach ($workerPools as $pool) {
+            $pool->awaitStopped($pool->stopDeadline(), $teardownStartedAt);
         }
     }
 

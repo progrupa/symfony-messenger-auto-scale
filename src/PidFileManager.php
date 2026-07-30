@@ -28,6 +28,35 @@ class PidFileManager implements BusyWorkerManager
         return file_exists($this->pidDir . '/' . $this->filePrefix . $pid);
     }
 
+    public function busyPids(): array
+    {
+        if (!is_dir($this->pidDir)) {
+            // The directory is created lazily by markBusy(), so its absence means
+            // no worker in this container has ever taken a message -- which is a
+            // legitimate "nothing is busy", not an error.
+            return [];
+        }
+
+        $pids = [];
+        $prefixLen = strlen($this->filePrefix);
+
+        foreach (glob($this->pidDir . '/' . $this->filePrefix . '*') ?: [] as $file) {
+            $pid = (int) substr(basename($file), $prefixLen);
+
+            // Same liveness test cleanup() uses. Pids are per PID-namespace, so
+            // this is only meaningful for markers written by processes sharing
+            // this one's namespace -- which is exactly the scope the caller
+            // cares about (is it safe to stop THIS container).
+            if ($pid > 0 && posix_kill($pid, 0)) {
+                $pids[] = $pid;
+            }
+        }
+
+        sort($pids);
+
+        return $pids;
+    }
+
     public function cleanup(): void
     {
         if (!is_dir($this->pidDir)) {

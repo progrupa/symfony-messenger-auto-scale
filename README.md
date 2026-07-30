@@ -331,18 +331,55 @@ class RedisBusyWorkerManager implements BusyWorkerManager
     public function markBusy(): void { /* ... */ }
     public function markIdle(): void { /* ... */ }
     public function isProcessBusy(int $pid): bool { /* ... */ }
+    public function busyPids(): array { /* ... */ }   // added in 2.0
     public function cleanup(): void { /* ... */ }
 }
 ```
 
 Register it as a service — Symfony's autowiring will pick your implementation over the bundle's default alias. The `busy_dir` and `busy_file_prefix` config options are ignored when using a custom implementation.
 
+`busyPids()` must return the pids of workers currently mid-message and must **exclude** markers whose process is gone — a stale pid reported as busy makes a drain gate wait forever. `PidFileManager` filters with `posix_kill($pid, 0)`.
+
 ### Scale-Down vs Shutdown
 
 Both scale-down and shutdown use the same busy worker guard, but differ in timeout behavior:
 
-- **Scale-down** (normal operation): Uses a 5-second timeout. If workers are still busy after 5 seconds, the supervisor gives up and retries on the next auto-scale cycle.
-- **Shutdown** (deployment/SIGTERM): Uses the `stop_deadline` timeout. After the deadline, remaining workers are force-killed (unless `stop_deadline` is `null`).
+- **Scale-down** (normal operation): Uses a 5-second timeout. If workers are still busy after 5 seconds, the supervisor gives up and retries on the next auto-scale cycle. Workers are released one per pass with a 500ms pause — deliberately, so the autoscaler does not thrash.
+- **Shutdown** (deployment/SIGTERM): Two phases, and *not* paced like scale-down.
+
+### Shutdown Is Two-Phase
+
+Shutdown does not reuse scale-down's pacing, because during teardown there is nothing to thrash and every idle worker should go at once:
+
+1. **Phase 1 (`WorkerPool::beginStop()`)** — one sweep over every worker: dead ones are dropped, idle ones are killed immediately, busy ones are left. Returns the number of stragglers.
+2. **Phase 2 (`WorkerPool::awaitStopped()`)** — waits only for those stragglers, re-checking every 250ms, then force-kills whatever remains once `stop_deadline` expires.
+
+`Supervisor` runs phase 1 across **all** pools before phase 2 begins on any of them, and passes every pool the **same** start time so their deadlines overlap rather than stack. Without the shared clock, four pools each willing to wait 300s add up to a 1200s worst case — well past any realistic `stop_grace_period`, so the process supervisor SIGKILLs the container and the stragglers die mid-message anyway.
+
+Net effect: teardown costs roughly *the longest single in-flight message*, not *sum over pools of (workers × 500ms + deadline)*. Previously a 43-worker pool spent ~21s shutting down even when every worker was idle, and a 200-worker pool would spend ~100s.
+
+`stop_deadline` semantics: omit it for the 300s default (`WorkerPool::DEFAULT_STOP_DEADLINE`); set it explicitly to `null` to wait indefinitely and never force-kill.
+
+### Checking Whether It Is Safe To Stop A Container
+
+`krak:auto-scale:drain-status` answers one question, machine-readably: is any worker **in this container** mid-message?
+
+```bash
+php bin/console krak:auto-scale:drain-status --json
+# {"safe_to_stop":false,"busy_workers":2,"busy_pids":[418,431],"error":null}
+```
+
+The exit code is the API:
+
+| Code | Meaning |
+|---|---|
+| `0` | Safe to stop — no worker is mid-message |
+| `1` | Busy — at least one worker is mid-message |
+| `2` | Unknown — state could not be read; **treat as busy** |
+
+Fail-closed on purpose: a caller that cannot read the state must wait rather than tear down.
+
+This is **not** the same as `krak:auto-scale:pool:status`. That command reads the pool control (Redis in production), whose keys are scoped by *pool name only* — so every container consuming the same pools shares them, and during a blue-green style deploy the value you read back may describe a different container's supervisor. `drain-status` reads only the process-local busy-marker directory, so nothing outside this container can influence the answer.
 
 ## Alerts
 
@@ -420,3 +457,26 @@ You can run the test suite with: `composer test`
 You'll need to start the redis docker container locally in order for the Feature test suite to pass.
 
 Keep in mind that you will need to have the redis-ext installed on your local php cli, and will need to start up the redis instance in docker via `docker-compose`.
+
+## Upgrading to 2.0
+
+**Breaking change: `BusyWorkerManager` gained a method.** If you implement that
+interface yourself (see *Custom BusyWorkerManager Implementation* above), add:
+
+```php
+/** @return int[] pids of workers currently mid-message, stale entries excluded */
+public function busyPids(): array;
+```
+
+Implementations must filter out markers whose process no longer exists. A stale
+pid reported as busy will make `krak:auto-scale:drain-status` — and any deploy
+gate built on it — wait indefinitely for work that has already finished.
+
+Nothing else requires action. If you use the default `PidFileManager`, this
+release is drop-in: shutdown gets faster (see *Shutdown Is Two-Phase*) and a new
+`krak:auto-scale:drain-status` command becomes available, with no config changes.
+
+One behaviour change worth knowing even on the default path: an explicit
+`stop_deadline: null` now means what it documented ("wait forever, never
+force-kill") instead of being coerced to the 300s default. Configs that omit
+`stop_deadline` are unaffected.
